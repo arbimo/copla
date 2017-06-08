@@ -14,7 +14,14 @@ object template {
   case class TDeadline(tp: TPRef, deadline: Int) extends Elem with ActionElem {
     override def toString: String = s"$tp <= $deadline"
   }
-
+  case class Delay(from: TPRef, to: TPRef) {
+    def <=(dur: Int) = to <= from + dur
+    def <(dur: Int)  = to < from + dur
+    def >=(dur: Int) = to >= from + dur
+    def >(dur: Int)  = to > from + dur
+    def +(time: Int) = Delay(from, to + 1)
+    def -(time: Int) = Delay(from, to - 1)
+  }
   class TPRef(val id: Symbol, val delay: Int = 0)(implicit val ctx: Context) {
     val tp: TTimepoint = ctx.findTimepoint(id) match {
       case Some(timepoint) => timepoint
@@ -28,12 +35,11 @@ object template {
 
     def <=(other: TPRef) = TBefore(this, other)
     def <(other: TPRef)  = TBefore(this, other + 1)
-
-    def <=(deadline: Int) = TDeadline(this, deadline)
-    def <(deadline: Int)  = TDeadline(this, deadline - 1)
+    def >=(other: TPRef) = other <= this
+    def >(other: TPRef)  = other < this
   }
-  implicit def symbol2tpref(s: Symbol)(implicit ctx: Context): TPRef =
-    new TPRef(s)
+  implicit def symbol2tpref(s: Symbol)(implicit ctx: Context): TPRef = new TPRef(s)
+  implicit def int2tpref(time: Int)(implicit ctx: Context)           = ctx.module.start + time
 
   class TTimepoint(val id: Symbol)(implicit ctx: Context) {
     ctx.localTimepoints += this
@@ -52,7 +58,7 @@ object template {
 
   trait ActionElem
 
-  case class Action(name: Symbol, parameters: Seq[Arg])(implicit val module: Module)
+  case class Action(name: Symbol, parameters: Seq[Arg])(implicit mod: Module)
       extends Elem
       with Context {
     implicit val ctx: Context = this
@@ -61,11 +67,11 @@ object template {
       ctx.localVariables += TVariable(param.name, param.typ)
 
     override def isTemplate                     = true
-    override def parentContext: Option[Context] = Some(module)
+    override def parentContext: Option[Context] = Some(mod)
 
-    val start = timepoint('start)
-    val end   = timepoint('end)
-    // val duration = delay(start, end)
+    val start    = timepoint('start)
+    val end      = timepoint('end)
+    val duration = Delay(start, end) + 1
 
     val elems = mutable.ArrayBuffer[ActionElem]()
 

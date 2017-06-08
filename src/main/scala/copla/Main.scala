@@ -35,6 +35,7 @@ object Lang {
     val int: Type = Type('int)
     val start     = timepoint('start)
     val end       = timepoint('end)
+    val makespan  = Delay(start, end) + 1
 
     val elems = mutable.ArrayBuffer[Elem]()
 
@@ -114,13 +115,15 @@ object Lang {
   trait InnerAssertion
   case class InnerEqualAssertion(sv: StateVariable, value: VRef) extends InnerAssertion {
     require(value.variable.typ.isSubtypeOf(sv.template.typ),
-      s"Variable $value is not of the expected type ${sv.template.typ}")
+            s"Variable $value is not of the expected type ${sv.template.typ}")
     override def toString = s"$sv === $value"
   }
   case class InnerTransitionAssertion(sv: StateVariable, startValue: VRef, endValue: VRef)
       extends InnerAssertion {
-    List(startValue, endValue).foreach(v => require(v.variable.typ.isSubtypeOf(sv.template.typ),
-            s"Variable $v is not of the expected type ${sv.template.typ}"))
+    List(startValue, endValue).foreach(
+      v =>
+        require(v.variable.typ.isSubtypeOf(sv.template.typ),
+                s"Variable $v is not of the expected type ${sv.template.typ}"))
 
     override def toString = s"$sv === $startValue -> $endValue"
   }
@@ -137,6 +140,14 @@ object Lang {
   trait Context {
     def isTemplate: Boolean
     def parentContext: Option[Context]
+    val module: Module = this match {
+      case m: Module => m
+      case _ =>
+        parentContext match {
+          case Some(parent) => parent.module
+          case None         => sys.error("This context is has no module as parent")
+        }
+    }
 
     val localVariables  = mutable.ArrayBuffer[TVariable]()
     val localTimepoints = mutable.ArrayBuffer[TTimepoint]()
@@ -185,11 +196,14 @@ object Main extends App {
     core(
       end <= 10,
       start <= 20,
+      makespan <= 10,
       at(start)(loc('r1) === 'l1 -> 'l2),
       over(start, end)(loc('r1) === 'l3)
     )
     val Go = new template.Action('Go, Nil) {
-      val x = ""
+      core(
+        duration <= 10
+      )
     }
   }
 
