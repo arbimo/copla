@@ -3,16 +3,16 @@ package copla
 import copla.lang.template
 
 import scala.collection.mutable
+import copla.lang.template._
+import Lang._
 
 object Lang {
-  import copla.lang.template._
-
   sealed trait Literal
   case class LInt(value: Int) extends Literal
   implicit def int2lint(v: Int): LInt = LInt(v)
 
   case class Instance(typ: Type, name: Symbol)(implicit val module: Module) {
-    module._instances += this
+    module.declaredInstances += this
 
     val tVariable                 = TVariable(name, typ) // creation is needed
     override def toString: String = name.toString()
@@ -29,8 +29,8 @@ object Lang {
     override def isTemplate: Boolean            = false
     override def parentContext: Option[Context] = None
 
-    val _instances = mutable.ArrayBuffer[Instance]()
-    val types      = mutable.ArrayBuffer[Type]()
+    val declaredInstances = mutable.ArrayBuffer[Instance]()
+    val types             = mutable.ArrayBuffer[Type]()
 
     val int: Type = Type('int)
     val start     = timepoint('start)
@@ -187,17 +187,16 @@ object Lang {
 }
 
 object Main extends App {
-  import Lang._
 
   val m = new Module('test) {
-    val location     = Type('Location)
-    val nav_location = Type('NavLocation) < location
-    val robot        = Type('Robot)
+    Type('Location)
+    Type('NavLocation) < 'Location
+    Type('Robot)
 
-    instances(robot, 'r1, 'r2, 'r3)
-    instances(nav_location, 'l1, 'l2, 'l3)
+    instances('Robot, 'r1, 'r2, 'r3)
+    instances('NavLocation, 'l1, 'l2, 'l3)
 
-    val loc = sv('loc, location, 'Robot ('r))
+    val loc = sv('loc, 'Location, 'Robot ('r))
 
     core(
       end <= 10,
@@ -206,7 +205,7 @@ object Main extends App {
       at(start)(loc('r1) === 'l1 -> 'l2),
       over(start, end)(loc('r1) === 'l3)
     )
-    val Go = new template.Action('Go, Nil) {
+    val go = new template.Action('Go, Nil) {
       core(
         duration <= 10
       )
@@ -214,6 +213,6 @@ object Main extends App {
   }
 
   println(m.elems.mkString("\n"))
-  println(m._instances)
+  println(m.declaredInstances)
   println(m.types)
 }
