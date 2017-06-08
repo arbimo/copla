@@ -64,6 +64,12 @@ object Lang {
     def isSubtypeOf(typ: Type): Boolean =
       this == typ || superType.exists(t => t == typ || t.isSubtypeOf(typ))
   }
+  implicit def symbol2type(s: Symbol)(implicit ctx: Context) = {
+    ctx.module.types.find(_.name == s) match {
+      case Some(typ) => typ
+      case None      => sys.error(s"Unable to find a type named $s")
+    }
+  }
 
   case class Arg(typ: Type, name: Symbol)
 
@@ -184,14 +190,14 @@ object Main extends App {
   import Lang._
 
   val m = new Module('test) {
-    val Location    = Type('Location)
-    val NavLocation = Type('NavLocation) < Location
-    val Robot       = Type('Robot)
+    val location     = Type('Location)
+    val nav_location = Type('NavLocation) < location
+    val robot        = Type('Robot)
 
-    val robots    = instances(Robot, 'r1, 'r2, 'r3)
-    val locations = instances(Location, 'l1, 'l2, 'l3)
+    instances(robot, 'r1, 'r2, 'r3)
+    instances(nav_location, 'l1, 'l2, 'l3)
 
-    val loc = sv('loc, Location, Robot('r))
+    val loc = sv('loc, location, 'Robot ('r))
 
     core(
       end <= 10,
