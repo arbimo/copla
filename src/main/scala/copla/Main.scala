@@ -6,6 +6,8 @@ import scala.collection.mutable
 import copla.lang.template._
 import Lang._
 
+import scala.languageFeature.implicitConversions
+
 object Lang {
   sealed trait Literal
   case class LInt(value: Int) extends Literal
@@ -25,17 +27,18 @@ object Lang {
   }
 
   class Module(val name: Symbol) extends Context {
-    implicit val ctx                            = this
-    override def isTemplate: Boolean            = false
-    override def parentContext: Option[Context] = None
+    implicit val ctx           = this
+    override def isTemplate    = false
+    override def parentContext = None
 
-    val declaredInstances = mutable.ArrayBuffer[Instance]()
-    val types             = mutable.ArrayBuffer[Type]()
+    val declaredInstances = mutable.Buffer[Instance]()
+    val types             = mutable.Buffer[Type]()
+    val stateVariables    = mutable.Buffer[StateVariableTemplate]()
 
-    val int: Type = Type('int)
-    val start     = timepoint('start)
-    val end       = timepoint('end)
-    val makespan  = Delay(start, end) + 1
+    val int      = Type('int)
+    val start    = timepoint('start)
+    val end      = timepoint('end)
+    val makespan = Delay(start, end) + 1
 
     val elems = mutable.ArrayBuffer[Elem]()
 
@@ -47,7 +50,7 @@ object Lang {
 
   case class Type(name: Symbol)(implicit val module: Module) {
     module.types += this
-    def apply(argumentName: Symbol): Arg = new Arg(this, argumentName)
+    def apply(argumentName: Symbol): Arg = Arg(this, argumentName)
 
     var superType: Option[Type] = None
     val subTypes                = mutable.ArrayBuffer[Type]()
@@ -55,7 +58,7 @@ object Lang {
     def <(parent: Type): Type = {
       assert(
         superType.isEmpty,
-        s"Type '$name' already has a super type (${superType.get}) when trying to make it inherit  $parent")
+        s"Type '$name' already has a super type (${superType.map(_.toString).getOrElse("???")}) when trying to make it inherit $parent")
       superType = Some(parent)
       parent.subTypes += this
       this
@@ -63,6 +66,8 @@ object Lang {
 
     def isSubtypeOf(typ: Type): Boolean =
       this == typ || superType.exists(t => t == typ || t.isSubtypeOf(typ))
+
+    def instances: Seq[Instance] = module.declaredInstances.filter(_.typ.isSubtypeOf(this))
   }
   implicit def symbol2type(s: Symbol)(implicit ctx: Context) = {
     ctx.module.types.find(_.name == s) match {
@@ -73,15 +78,20 @@ object Lang {
 
   case class Arg(typ: Type, name: Symbol)
 
-  case class StateVariableTemplate(name: Symbol, typ: Type, params: Seq[Arg]) extends Elem {
-    def apply(variables: VRef*): StateVariable = {
+  case class StateVariableTemplate(name: Symbol, typ: Type, params: Seq[Arg])(
+      implicit ctx: Context)
+      extends Elem {
+    require(ctx == ctx.module, "State variables can only be declared at top level")
+
+    def apply(variables: VRef*)(implicit ctx: Context): StateVariable = {
       require(params.size == variables.size,
               s"Wrong number of arguments for state variable, $name")
       StateVariable(this, variables)
     }
   }
 
-  case class StateVariable(template: StateVariableTemplate, params: Seq[VRef]) {
+  case class StateVariable(template: StateVariableTemplate, params: Seq[VRef])(
+      implicit ctx: Context) {
     require(template.params.size == params.size)
     template.params.zip(params).foreach {
       case (tpl, ref) =>
@@ -97,7 +107,7 @@ object Lang {
   }
 
   def sv(name: Symbol, typ: Type, params: Arg*)(implicit module: Module): StateVariableTemplate = {
-    val sv = new StateVariableTemplate(name, typ, params)
+    val sv = StateVariableTemplate(name, typ, params)
     module.add(sv)
     sv
   }
@@ -119,17 +129,25 @@ object Lang {
     override def toString = s"$interval $inner"
   }
   trait InnerAssertion
-  case class InnerEqualAssertion(sv: StateVariable, value: VRef) extends InnerAssertion {
+  case class InnerEqualAssertion(sv: StateVariable, value: VRef)(implicit ctx: Context)
+      extends InnerAssertion {
+    val start = timepoint('start)
+    val end   = timepoint('end)
     require(value.variable.typ.isSubtypeOf(sv.template.typ),
             s"Variable $value is not of the expected type ${sv.template.typ}")
     override def toString = s"$sv === $value"
   }
-  case class InnerTransitionAssertion(sv: StateVariable, startValue: VRef, endValue: VRef)
+
+  case class InnerTransitionAssertion(sv: StateVariable, startValue: VRef, endValue: VRef)(
+      implicit ctx: Context)
       extends InnerAssertion {
     List(startValue, endValue).foreach(
       v =>
         require(v.variable.typ.isSubtypeOf(sv.template.typ),
                 s"Variable $v is not of the expected type ${sv.template.typ}"))
+
+    val start = timepoint('start)
+    val end   = timepoint('end)
 
     override def toString = s"$sv === $startValue -> $endValue"
   }
