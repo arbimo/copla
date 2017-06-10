@@ -3,9 +3,12 @@ package copla
 import copla.lang.template
 
 import scala.collection.mutable
+import copla.lang.exception._
 import copla.lang.template._
 import Lang._
+import copla.collection.mutable.CheckedBuffer
 
+import scala.collection.parallel.immutable
 import scala.languageFeature.implicitConversions
 
 object Lang {
@@ -26,7 +29,7 @@ object Lang {
     names.map(Instance(typ, _).tVariable.ref).toList // create all instances
   }
 
-  class Module(val name: Symbol) extends Context {
+  class Module(val name: String) extends Context {
     implicit val ctx           = this
     override def isTemplate    = false
     override def parentContext = None
@@ -56,7 +59,7 @@ object Lang {
     val subTypes                = mutable.ArrayBuffer[Type]()
 
     def <(parent: Type): Type = {
-      assert(
+      assert1(
         superType.isEmpty,
         s"Type '$name' already has a super type (${superType.map(_.toString).getOrElse("???")}) when trying to make it inherit $parent")
       superType = Some(parent)
@@ -91,7 +94,7 @@ object Lang {
   }
 
   case class StateVariable(template: StateVariableTemplate, params: Seq[VRef])(
-      implicit ctx: Context) {
+      implicit ctx: Context) extends ModuleElem {
     require(template.params.size == params.size)
     template.params.zip(params).foreach {
       case (tpl, ref) =>
@@ -125,7 +128,7 @@ object Lang {
   def at(tp: TPRef): Interval                  = Interval(tp, tp)
   def over(start: TPRef, end: TPRef): Interval = Interval(start, end)
 
-  case class TAssertion(interval: Interval, inner: InnerAssertion) extends Elem {
+  case class TAssertion(interval: Interval, inner: InnerAssertion) extends Elem with ModuleElem{
     override def toString = s"$interval $inner"
   }
   trait InnerAssertion
@@ -152,7 +155,7 @@ object Lang {
     override def toString = s"$sv === $startValue -> $endValue"
   }
 
-  case class TVariable(id: Symbol, typ: Type)(implicit ctx: Context) {
+  case class TVariable(id: Symbol, typ: Type)(implicit ctx: Context) extends ModuleElem {
     val global: Option[Variable] =
       if (ctx.isTemplate) None
       else Some(Variable(id, typ))
@@ -173,8 +176,13 @@ object Lang {
         }
     }
 
-    val localVariables  = mutable.ArrayBuffer[TVariable]()
-    val localTimepoints = mutable.ArrayBuffer[TTimepoint]()
+    val localVariables: mutable.Buffer[TVariable] = CheckedBuffer(elems => {
+      assert2(elems.map(_.id).distinct.size == elems.size,
+             "Cannot define two variables with the same id in the same scope")
+    })
+    val localTimepoints: mutable.Buffer[TTimepoint] = CheckedBuffer(elems => {
+      assert2(elems.distinct.size == elems.size)
+    })
 
     def findVariable(id: Symbol): Option[TVariable] = {
       localVariables.find(_.id == id) match {
@@ -202,11 +210,16 @@ object Lang {
     override def toString = id.toString()
   }
   case class Transition(vStart: VRef, vEnd: VRef)
+
+
+
+  trait ModuleElem extends Elem
+
 }
 
 object Main extends App {
 
-  val m = new Module('test) {
+  val m = new Module("test") {
     Type('Location)
     Type('NavLocation) < 'Location
     Type('Robot)

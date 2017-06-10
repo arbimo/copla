@@ -1,14 +1,11 @@
 package copla.lang
 
-import rx.Rx
-
 import scala.collection.mutable
 
 object template {
   import copla.Lang._
 
   case class TBefore(from: TPRef, to: TPRef) extends Elem with ActionElem {
-
     override def toString: String = s"$from <= $to"
   }
   case class TDeadline(tp: TPRef, deadline: Int) extends Elem with ActionElem {
