@@ -9,7 +9,11 @@ class AnmlParsingTest extends FunSuite {
     "type a;",
     " type a ; ",
     "type b2;",
-    "type a; type b < a;"
+    "type a; type b < a;",
+    "type A; instance A a;",
+    "type A; instance A a, b, c;",
+    "type A;  instance   A  a ,b , c,d, e ; ",
+    "type A; instance A a1, a2; type B < A; instance A a3; instance B b1, b2;"
   )
 
   def invalid = Seq(
@@ -17,17 +21,19 @@ class AnmlParsingTest extends FunSuite {
     "type type;",
     "type a < a;",
     "type a; type a;",
-    "type a < b;"
+    "type a < b;",
+    "type A; instance B a;",
+    "type A; instance A;",
+    "type A; instance A a, a;",
+    "type A; instance A A;"
   )
 
   for(anml <- valid) {
     test("valid: "+anml) {
       Parser.parse(anml) match {
         case Success(module, _) =>
-          println("PARSED:")
-          println(anml)
-          println("\nAS:")
-          println(module)
+          println("PARSED:\n"+anml+"\n")
+          println("AS:\n"+module+"\n\n")
         case x =>
           fail(s"Could not parse anml string: $x\n\n$anml\n")
       }
@@ -47,7 +53,8 @@ class AnmlParsingTest extends FunSuite {
 
 
   val tmp = "type a < a;"
-  test("debug: tmpoary") {
+  test("debug: temporary") {
+    /** Dummy text to facilitate testing. */
     println(tmp)
     println(Parser.parse(tmp))
   }

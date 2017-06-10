@@ -11,31 +11,22 @@ package object model {
 
   case class Type(name: String, parent: Option[Type]) extends ModuleElem {
 
-    def apply(argumentName: String): Arg = Arg(this, argumentName)
-
-    def <(parent: Type): Type = {
-      assert1(
-        this.parent.isEmpty,
-        s"Type '$name' already has a super type (${this.parent.get}) when trying to make it inherit $parent")
-      Type(name, Some(parent))
-    }
-
     def isSubtypeOf(typ: Type): Boolean =
       this == typ || parent.exists(t => t == typ || t.isSubtypeOf(typ))
   }
 
-  case class Arg(typ: Type, name: String)
+
 
   case class StateVariableTemplate(name: String, typ: Type, params: Seq[Arg]) extends ModuleElem {
 
-    def apply(variables: TVariable*): StateVariable = {
+    def apply(variables: Var*): StateVariable = {
       require(params.size == variables.size,
               s"Wrong number of arguments for state variable, $name")
       StateVariable(this, variables)
     }
   }
 
-  case class StateVariable(template: StateVariableTemplate, params: Seq[TVariable]) extends ModuleElem {
+  case class StateVariable(template: StateVariableTemplate, params: Seq[Var]) extends ModuleElem {
     require(template.params.size == params.size)
     template.params.zip(params).foreach {
       case (tpl, v) =>
@@ -50,7 +41,22 @@ package object model {
     override def toString = s"${template.name}(${params.mkString(", ")})"
   }
 
-  case class TVariable(id: String, typ: Type) extends ModuleElem
+  trait Var {
+    def id: String
+    def typ: Type
+  }
+  object Var {
+    def unapply(v: Var)= Option(v.id, v.typ)
+  }
+
+  /** Variable declared locally */
+  case class LocalVar(id: String, typ: Type) extends Var with ModuleElem
+
+  /** Instance of a given type, result of the ANML statement "instance Type id;" */
+  case class Instance(id: String, typ: Type) extends Var with ModuleElem
+
+  /** Denote the argument of the template of state variables and actions. */
+  case class Arg(id: String, typ: Type) extends Var
 
   case class Delay(from: TPRef, to: TPRef) {
     def <=(dur: Int) = to <= from + dur
@@ -82,9 +88,9 @@ package object model {
     def elems: Seq[Elem]
     def parent: Option[Ctx]
 
-    def findVariable(id: String): Option[TVariable] =
+    def findVariable(id: String): Option[Var] =
       elems
-        .collect { case x @ TVariable(`id`, _) => x }
+        .collect { case x @ Var(`id`, _) => x }
         .headOption
         .orElse(parent.flatMap(_.findVariable(id)))
 
@@ -99,6 +105,8 @@ package object model {
       .headOption
       .orElse(parent.flatMap(_.findType(id)))
   }
+
+
 
   case class Mod(elems: Seq[ModuleElem] = Seq()) extends Ctx {
     override def parent = None
