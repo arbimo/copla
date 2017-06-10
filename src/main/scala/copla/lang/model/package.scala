@@ -24,6 +24,8 @@ package object model {
               s"Wrong number of arguments for state variable, $name")
       StateVariable(this, variables)
     }
+
+    override def toString = s"$name(${params.mkString(", ")})->${typ.name}"
   }
 
   case class StateVariable(template: StateVariableTemplate, params: Seq[Var]) extends ModuleElem {
@@ -56,7 +58,9 @@ package object model {
   case class Instance(id: String, typ: Type) extends Var with ModuleElem
 
   /** Denote the argument of the template of state variables and actions. */
-  case class Arg(id: String, typ: Type) extends Var
+  case class Arg(id: String, typ: Type) extends Var {
+    override def toString = s"${typ.name} $id"
+  }
 
   case class Delay(from: TPRef, to: TPRef) {
     def <=(dur: Int) = to <= from + dur
@@ -105,8 +109,6 @@ package object model {
       .headOption
       .orElse(parent.flatMap(_.findType(id)))
   }
-
-
 
   case class Mod(elems: Seq[ModuleElem] = Seq()) extends Ctx {
     override def parent = None

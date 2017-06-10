@@ -13,7 +13,11 @@ class AnmlParsingTest extends FunSuite {
     "type A; instance A a;",
     "type A; instance A a, b, c;",
     "type A;  instance   A  a ,b , c,d, e ; ",
-    "type A; instance A a1, a2; type B < A; instance A a3; instance B b1, b2;"
+    "type A; instance A a1, a2; type B < A; instance A a3; instance B b1, b2;",
+    "type A; type B; fluent A sv(A first, B second);",
+    "type A; fluent A sv;",
+    "type A; fluent A sv();",
+    "type A; instance A x; fluent A sv(A x);" // shadowing allowed (might benefit from warning
   )
 
   def invalid = Seq(
@@ -25,7 +29,11 @@ class AnmlParsingTest extends FunSuite {
     "type A; instance B a;",
     "type A; instance A;",
     "type A; instance A a, a;",
-    "type A; instance A A;"
+    "type A; instance A A;",
+    "fluent A sv;",
+    "type A; fluent A sv(B b);",
+    "type A; fluent A sv(A)",
+    "type A; instance A sv; fluent A sv(A x)"
   )
 
   for(anml <- valid) {
