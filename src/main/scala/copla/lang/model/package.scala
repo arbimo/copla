@@ -106,6 +106,10 @@ package object model {
       Some(Mod(elem +: elems))
     }
 
+    def ++(elems: Seq[ModuleElem]): Option[Mod] = {
+      elems.foldLeft(Option(this))((m, elem) => m.flatMap(_ + elem))
+    }
+
     override def toString =
       "module:\n" + elems.map("  "+_).reverse.mkString("\n")
   }

@@ -53,15 +53,15 @@ object Parser {
         case (name, parentOpt) => Type(name, parentOpt)
       }
 
-//  val instancesDeclaration = instance ~ typeName ~ variableName.rep(1) ~ ";"
 
-  def elem(m: Mod): Parser[ModuleElem] =
-    typeDeclaration(m)
+
+  def elem(m: Mod): Parser[Seq[ModuleElem]] =
+    typeDeclaration(m).map(Seq(_))
 
   def anmlParser(mod: Mod): Parser[Mod] =
     End.map(_ => mod) |
       (Pass ~ elem(mod) ~ Pass).flatMap(elem =>
-        mod + elem match {
+        mod ++ elem match {
           case Some(extended) => anmlParser(extended)
           case None           => Fail
       })
