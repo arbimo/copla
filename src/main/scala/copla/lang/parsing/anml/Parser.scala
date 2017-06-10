@@ -17,15 +17,14 @@ object Parser {
   }
   import fastparse.noApi._
   import White._
-  val whitespace = CharsWhileIn(" \r\n\t", min = 1)
-  import Parsed.{Success, Failure}
 
-  val instance = P("instance")
+
   val word: Parser[String] =
     (CharIn(('a' to 'z') ++ ('A' to 'Z')) ~ CharsWhileIn(
       ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9'),
       min = 0)).!
   val typeKW: Parser[Unit] = word.filter(_ == "type").map(x => {}).opaque("type")
+  val instanceKW = word.filter(_ == "instance").map(_ => {}).opaque("instance")
   val keywords             = Set("type", "instance", "action", "duration")
   val reservedTypeNames    = Set()
   val nonIdent             = keywords ++ reservedTypeNames
@@ -33,6 +32,8 @@ object Parser {
   val ident                    = word.filter(!nonIdent.contains(_)).opaque("identifier")
   val typeName: Parser[String] = word.filter(!keywords.contains(_)).opaque("type-name")
   val variableName             = ident.opaque("variable-name")
+
+  def isFree(id: String, c: Mod) = c.findType(id).orElse(c.findTimepoint(id)).orElse(c.findVariable(id)).isEmpty
 
   def declaredType(c: Mod): Parser[Type] =
     typeName
@@ -43,7 +44,7 @@ object Parser {
   def typeDeclaration(c: Mod): Parser[Type] =
     (typeKW ~/
       typeName
-        .filter(c.findType(_).isEmpty)
+        .filter(isFree(_, c))
         .opaque("previously-undefined-type")
         .!
       ~ ("<" ~/ declaredType(c).!).asInstanceOf[Parser[Type]].?
@@ -52,7 +53,7 @@ object Parser {
         case (name, parentOpt) => Type(name, parentOpt)
       }
 
-  val instancesDeclaration = instance ~ typeName ~ variableName.rep(1) ~ ";"
+//  val instancesDeclaration = instance ~ typeName ~ variableName.rep(1) ~ ";"
 
   def elem(m: Mod): Parser[ModuleElem] =
     typeDeclaration(m)
