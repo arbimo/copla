@@ -44,7 +44,7 @@ package object model {
   }
 
   trait Var {
-    def id: String
+    def id: Id
     def typ: Type
   }
   object Var {
@@ -52,13 +52,13 @@ package object model {
   }
 
   /** Variable declared locally */
-  case class LocalVar(id: String, typ: Type) extends Var with ModuleElem
+  case class LocalVar(id: Id, typ: Type) extends Var with ModuleElem
 
   /** Instance of a given type, result of the ANML statement "instance Type id;" */
-  case class Instance(id: String, typ: Type) extends Var with ModuleElem
+  case class Instance(id: Id, typ: Type) extends Var with ModuleElem
 
   /** Denote the argument of the template of state variables and actions. */
-  case class Arg(id: String, typ: Type) extends Var {
+  case class Arg(id: Id, typ: Type) extends Var {
     override def toString = s"${typ.name} $id"
   }
 
@@ -71,9 +71,9 @@ package object model {
     def -(time: Int) = Delay(from, to - 1)
   }
 
-  class TPRef(val id: String, val delay: Int = 0) {
+  class TPRef(val id: Id, val delay: Int = 0) {
 
-    override def toString = id.toString()
+    override def toString = id.toString
 
     def +(delay: Int) = new TPRef(id, this.delay + delay)
     def -(delay: Int) = new TPRef(id, this.delay - delay)
@@ -88,15 +88,32 @@ package object model {
     override def toString: String = s"$from <= $to"
   }
 
+  case class Id(scope: Scope, name: String) {
+    override def toString = scope.toInScopeString(name)
+  }
+
+  case class Scope(path: Seq[String]) {
+
+    def +(nestedScope: String) : Scope = Scope(path :+ nestedScope)
+
+    override def toString = path.mkString(".")
+    def toInScopeString(name: String) = (path :+ name).mkString(".")
+  }
+
   trait Ctx {
     def elems: Seq[Elem]
     def parent: Option[Ctx]
+    def name: String
 
-    def findVariable(id: String): Option[Var] =
+    val scope: Scope = parent.map(_.scope +name).getOrElse(Scope(Seq(name)))
+
+    def id(name: String): Id = Id(scope, name)
+
+    def findVariable(name: String): Option[Var] =
       elems
-        .collect { case x @ Var(`id`, _) => x }
+        .collect { case x @ Var(Id(_, `name`), _) => x }
         .headOption
-        .orElse(parent.flatMap(_.findVariable(id)))
+        .orElse(parent.flatMap(_.findVariable(name)))
 
     def findTimepoint(id: String): Option[TPRef] =
       elems
@@ -110,13 +127,16 @@ package object model {
       .orElse(parent.flatMap(_.findType(id)))
   }
 
-  case class Mod(elems: Seq[ModuleElem] = Seq()) extends Ctx {
+  case class Model(elems: Seq[ModuleElem] = Seq()) extends Ctx {
     override def parent = None
-    def +(elem: ModuleElem): Option[Mod] = {
-      Some(Mod(elem +: elems))
+    override def name = "_module_"
+    override val scope = Scope(Seq()) // root scope
+
+    def +(elem: ModuleElem): Option[Model] = {
+      Some(Model(elem +: elems))
     }
 
-    def ++(elems: Seq[ModuleElem]): Option[Mod] = {
+    def ++(elems: Seq[ModuleElem]): Option[Model] = {
       elems.foldLeft(Option(this))((m, elem) => m.flatMap(_ + elem))
     }
 
