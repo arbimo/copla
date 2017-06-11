@@ -1,6 +1,7 @@
 package copla.lang.parsing.anml
 
 import copla.lang.model._
+import fastparse.core.Parsed.{Failure, Success}
 
 object Parser {
 
@@ -24,7 +25,8 @@ object Parser {
   val typeKW: Parser[Unit] = word.filter(_ == "type").map(x => {}).opaque("type")
   val instanceKW           = word.filter(_ == "instance").map(_ => {}).opaque("instance")
   val fluentKW             = word.filter(_ == "fluent").map(_ => {}).opaque("instance")
-  val keywords             = Set("type", "instance", "action", "duration", "fluent", "predicate")
+  val timepointKW          = word.filter(_ == "timepoint").map(_ => {}).opaque("instance")
+  val keywords             = Set("type", "instance", "action", "duration", "fluent", "predicate", "timepoint")
   val reservedTypeNames    = Set()
   val nonIdent             = keywords ++ reservedTypeNames
 
@@ -32,7 +34,7 @@ object Parser {
   val typeName: Parser[String] = word.filter(!keywords.contains(_)).opaque("type-name")
   val variableName             = ident.opaque("variable-name")
 
-  def isFree(id: String, c: Model) =
+  def isFree(id: String, c: Ctx) =
     c.findType(id).orElse(c.findTimepoint(id)).orElse(c.findVariable(id)).isEmpty &&
       !keywords.contains(id)
 
@@ -50,9 +52,8 @@ object Parser {
         .!
       ~ ("<" ~/ declaredType(c).!).asInstanceOf[Parser[Type]].?
       ~ ";")
-      .map {
-        case (name, parentOpt) => Type(name, parentOpt)
-      }
+      .map { case (name, parentOpt) => Type(name, parentOpt) }
+      .opaque("type-declaration")
 
   /** Parser for isntance declaration.
     * "instance Type id1, id2, id3;" */
@@ -73,7 +74,7 @@ object Parser {
 
     (instanceKW ~/ declaredType(m) ~/ distinctFreeIdents(m, Nil, ",", ";"))
       .map { case (typ, instanceNames) => instanceNames.map(name => Instance(m.id(name), typ)) }
-  }
+  }.opaque("instance declaration")
 
   protected def arg(m: Model): Parser[(String, Type)] =
     (declaredType(m) ~ ident.filter(!keywords.contains(_)))
@@ -81,9 +82,12 @@ object Parser {
       .map { case (typ, argName) => (argName, typ) }
 
   /** A liest of at least one argument formated as "Type1 arg, Type2 arg2" */
-  protected def distinctArgSeq(m: Model, sep: String, previous: Seq[(String, Type)] = Seq()): Parser[Seq[(String, Type)]] =
+  protected def distinctArgSeq(
+      m: Model,
+      sep: String,
+      previous: Seq[(String, Type)] = Seq()): Parser[Seq[(String, Type)]] =
     Pass ~ arg(m)
-      .filter(a => !previous.exists(_._1 == a._1))  // disallow args with same name
+      .filter(a => !previous.exists(_._1 == a._1)) // disallow args with same name
       .opaque("argument-declaration")
       .flatMap(a =>
         (Pass ~ sep ~/ distinctArgSeq(m, sep, previous :+ a)) | PassWith(previous :+ a))
@@ -92,17 +96,28 @@ object Parser {
     * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
     */
   protected def args(m: Model): Parser[Seq[(String, Type)]] =
-    ("(" ~ (distinctArgSeq(m, ",") | PassWith(Seq())) ~ ")") |  // parenthesis with and withour args
+    ("(" ~ (distinctArgSeq(m, ",") | PassWith(Seq())) ~ ")") | // parenthesis with and withour args
       PassWith(Seq()) // no args no parenthesis
 
   def stateVariableDeclaration(m: Model): Parser[StateVariableTemplate] =
     (fluentKW ~/ declaredType(m) ~ ident.filter(isFree(_, m)) ~ args(m) ~ ";")
-      .map { case (typ, svName, args) => StateVariableTemplate(svName, typ, args.map {case (name, argType) => Arg(Id(m.scope+svName, name), argType)}) }
+      .map {
+        case (typ, svName, args) =>
+          StateVariableTemplate(svName, typ, args.map {
+            case (name, argType) => Arg(Id(m.scope + svName, name), argType)
+          })
+      }
+      .opaque("state-variable-declaration")
+
+  def timepointDeclation(c: Ctx): Parser[TPRef] =
+    (timepointKW ~/ ident.filter(isFree(_, c)).map(name => TPRef(c.id(name))) ~ ";")
+      .opaque("timepoint-declaration")
 
   def elem(m: Model): Parser[Seq[ModuleElem]] =
     typeDeclaration(m).map(Seq(_)) |
       instancesDeclaration(m) |
-      stateVariableDeclaration(m).map(Seq(_))
+      stateVariableDeclaration(m).map(Seq(_)) |
+      timepointDeclation(m).map(Seq(_))
 
   def anmlParser(mod: Model): Parser[Model] =
     End.map(_ => mod) |
@@ -113,7 +128,17 @@ object Parser {
       })
 
   def parse(input: String) = {
-    val emptyModule = Model()
-    anmlParser(emptyModule).parse(input)
+    anmlParser(baseAnmlModel).parse(input)
   }
+
+  val baseAnmlModel = anmlParser(Model()).parse("""
+      |type boolean;
+      |instance boolean true, false;
+      |timepoint start;
+      |timepoint end;
+    """.stripMargin) match {
+    case Success(m, _) => m
+    case x             => sys.error(s"Could not build the base anml model: $x")
+  }
+
 }

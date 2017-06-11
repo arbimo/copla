@@ -1,10 +1,14 @@
 package copla.lang
 
+import copla.lang.parsing.anml.Parser
 import exception._
 
 package object model {
 
-  trait Elem
+  trait Elem {
+    def inlineRepresentation: String = toString
+    def fullRepresentation: String = toString
+  }
   trait ModuleElem extends Elem
   trait Statement extends ModuleElem
   trait TimedSymExpr extends Elem
@@ -13,6 +17,10 @@ package object model {
 
     def isSubtypeOf(typ: Type): Boolean =
       this == typ || parent.exists(t => t == typ || t.isSubtypeOf(typ))
+
+    override def toString = name
+    override def inlineRepresentation = name
+    override def fullRepresentation = s"type $name" + { if(parent.isDefined) " < "+parent.get else "" }
   }
 
 
@@ -43,9 +51,12 @@ package object model {
     override def toString = s"${template.name}(${params.mkString(", ")})"
   }
 
-  trait Var {
+  trait Var extends Elem {
     def id: Id
     def typ: Type
+
+    override def inlineRepresentation = id.toString
+    override def fullRepresentation = s"$typ $id"
   }
   object Var {
     def unapply(v: Var)= Option(v.id, v.typ)
@@ -55,7 +66,9 @@ package object model {
   case class LocalVar(id: Id, typ: Type) extends Var with ModuleElem
 
   /** Instance of a given type, result of the ANML statement "instance Type id;" */
-  case class Instance(id: Id, typ: Type) extends Var with ModuleElem
+  case class Instance(id: Id, typ: Type) extends Var with ModuleElem {
+    override def fullRepresentation = s"instance $typ $id"
+  }
 
   /** Denote the argument of the template of state variables and actions. */
   case class Arg(id: Id, typ: Type) extends Var {
@@ -71,12 +84,19 @@ package object model {
     def -(time: Int) = Delay(from, to - 1)
   }
 
-  class TPRef(val id: Id, val delay: Int = 0) {
+  /** A timepoint, declared when appearing in the root of a context.*/
+  case class TPRef(id: Id, delay: Int = 0) extends ModuleElem {
 
-    override def toString = id.toString
+    override def toString = id.toString + (delay match {
+      case 0 => ""
+      case d if d > 0 => s"+$d"
+      case d if d < 0 => s"-${-d}"
+    })
+    override def inlineRepresentation = toString
+    override def fullRepresentation = s"timepoint "+toString
 
-    def +(delay: Int) = new TPRef(id, this.delay + delay)
-    def -(delay: Int) = new TPRef(id, this.delay - delay)
+    def +(delay: Int) = TPRef(id, this.delay + delay)
+    def -(delay: Int) = TPRef(id, this.delay - delay)
 
     def <=(other: TPRef) = TBefore(this, other)
     def <(other: TPRef)  = TBefore(this, other + 1)
@@ -141,7 +161,11 @@ package object model {
     }
 
     override def toString =
-      "module:\n" + elems.map("  "+_).reverse.mkString("\n")
+      "module:\n" +
+        elems
+          .filter(!Parser.baseAnmlModel.elems.contains(_))
+          .map("  "+_.fullRepresentation)
+          .reverse
+          .mkString("\n")
   }
-
 }
