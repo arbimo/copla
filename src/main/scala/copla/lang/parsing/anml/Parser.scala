@@ -87,7 +87,7 @@ object Parser {
       .opaque("argument-declaration")
       .map { case (typ, argName) => (argName, typ) }
 
-  /** A liest of at least one argument formated as "Type1 arg, Type2 arg2" */
+  /** A liest of at least one argument formatted as "Type1 arg, Type2 arg2" */
   protected def distinctArgSeq(
       m: Model,
       sep: String,
@@ -121,7 +121,6 @@ object Parser {
       freeIdent(c).map(name => TimepointDeclaration(TPRef(c.id(name)))) ~
       ";"
 
-
   protected def definedTP(c: Ctx): Parser[TPRef] =
     ident
       .map(c.findTimepoint)
@@ -143,7 +142,7 @@ object Parser {
         i => // integer as a tp defined relatively to the global start, if one exists
           c.root.findTimepoint("start") match {
             case Some(st) => PassWith(st + i)
-            case None     => Fail
+            case None     => Fail.opaque("fail:no start timepoint in top level scope")
         })
   }.opaque("timepoint")
 
@@ -155,10 +154,11 @@ object Parser {
           case None           => sys.error("No start/end timepoint"); Fail
       })
       .opaque("duration") |
-      (timepoint(c) ~ "-" ~ definedTP(c) ~ (("+"|"-").! ~ int).?).map {
-        case (t1, t2, None) => t1 - t2
-        case (t1, t2, Some(("+", i))) => (t1 -t2) + i
-        case (t1, t2, Some(("-", i))) => (t1 -t2) - i
+      (timepoint(c) ~ "-" ~ definedTP(c) ~ (("+" | "-").! ~ int).?).map {
+        case (t1, t2, None)           => t1 - t2
+        case (t1, t2, Some(("+", i))) => (t1 - t2) + i
+        case (t1, t2, Some(("-", i))) => (t1 - t2) - i
+        case _                        => sys.error("Buggy parser implementation")
       }
 
   def temporalConstraint(c: Ctx): Parser[Seq[TBefore]] = {
@@ -180,6 +180,48 @@ object Parser {
           case (d, eq, t) if Set("=", "==", ":=").contains(eq) => d === t
           case _                                               => sys.error("Buggy parser implementation")
         }
+  }
+
+  def variable(c: Ctx): Parser[Var] =
+    ident.flatMap(name =>
+      c.findVariable(name) match {
+        case Some(v) => PassWith(v)
+        case None    => println(c.elems.mkString("\n")); Fail.opaque(s"fail:no variable $name")
+    })
+
+  def fluent(c: Ctx): Parser[FluentTemplate] =
+    ident.flatMap(name =>
+      c.findFluent(name) match {
+        case Some(v) => PassWith(v)
+        case None    => Fail.opaque(s"fail:fluent not found: $name")
+    })
+
+  def timedSymExpr(c: Ctx): Parser[TimedSymExpr] = {
+    def varList(c: Ctx,
+                expectedTypes: Seq[Type],
+                sep: String,
+                previous: Seq[Var] = Seq()): Parser[Seq[Var]] = {
+      if (expectedTypes.isEmpty) {
+        PassWith(previous)
+      } else {
+        variable(c).flatMap(v => {
+          if (v.typ.isSubtypeOf(expectedTypes.head)) {
+            if (expectedTypes.tail.isEmpty)
+              PassWith(previous :+ v)
+            else
+              Pass ~ sep ~/ varList(c, expectedTypes.tail, sep, previous :+ v)
+          } else {
+            Fail.opaque(s"fail:wrong type for var $v (${v.typ}), expecting ${expectedTypes.head}")
+          }
+        })
+      }
+    }
+    (fluent(c) ~/ Pass).flatMap(f =>
+      f.params.map(param => param.typ) match {
+        case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq()))
+        case paramTypes =>
+          "(" ~/ varList(c, paramTypes, ",").map(args => Fluent(f, args)) ~ ")" ~/ Pass
+    })
   }
 
   def elem(m: Model): Parser[Seq[ModuleElem]] =

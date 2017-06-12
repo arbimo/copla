@@ -15,6 +15,7 @@ class AnmlParsingTest extends FunSuite {
     "type A;  instance   A  a ,b , c,d, e ; ",
     "type A; instance A a1, a2; type B < A; instance A a3; instance B b1, b2;",
     "type A; type B; fluent A sv(A first, B second);",
+    "type A; type B; fluent A f(B b); instance B b1;",
     "type A; fluent A sv;",
     "type A; fluent A sv();",
     "type A; instance A x; fluent A sv(A x);", // shadowing allowed (might benefit from warning)
@@ -44,20 +45,20 @@ class AnmlParsingTest extends FunSuite {
     "timepoint t; start - end < t;"
   )
 
-  for(anml <- valid) {
-    test("valid: "+anml) {
+  for (anml <- valid) {
+    test("valid: " + anml) {
       Parser.parse(anml) match {
         case Success(module, _) =>
-          println("PARSED:\n"+anml+"\n")
-          println("AS:\n"+module+"\n\n")
+          println("PARSED:\n" + anml + "\n")
+          println("AS:\n" + module + "\n\n")
         case x =>
           fail(s"Could not parse anml string: $x\n\n$anml\n")
       }
     }
   }
 
-  for(anml <- invalid) {
-    test("invalid: "+anml) {
+  for (anml <- invalid) {
+    test("invalid: " + anml) {
       Parser.parse(anml) match {
         case Success(module, _) =>
           fail(s"Following anml string should be invalid:\n$anml\n\nParsed to:\n $module")
@@ -67,9 +68,23 @@ class AnmlParsingTest extends FunSuite {
     }
   }
 
+  test("timed-expression") {
+    val ctx  = "type A; type B; fluent A f(B b, B x); instance B b1, b2;"
+    val mod  = Parser.parse(ctx).get.value
+    val anml = "f(b1, b2)"
+    Parser.timedSymExpr(mod).parse(anml) match {
+      case Success(expr, _) =>
+        println("PARSED:\n" + anml + "\n")
+        println("AS:\n" + expr + "\n\n")
+
+      case x =>
+        fail(s"Could not parse anml string: $x\n\n$anml\n")
+    }
+  }
 
   val tmp = "start < end;"
   test("debug: temporary") {
+
     /** Dummy text to facilitate testing. */
     println(tmp)
     println(Parser.parse(tmp))
