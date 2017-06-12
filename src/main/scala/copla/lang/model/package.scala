@@ -5,10 +5,7 @@ import exception._
 
 package object model {
 
-  trait Elem {
-    def inlineRepresentation: String = toString
-    def fullRepresentation: String = toString
-  }
+  trait Elem
   trait ModuleElem extends Elem
   trait Statement extends ModuleElem
   trait TimedSymExpr extends Elem
@@ -17,13 +14,11 @@ package object model {
     def id: Id
   }
 
-  case class Type(name: String, parent: Option[Type]) extends ModuleElem {
+  case class Type(id: Id, parent: Option[Type]) extends ModuleElem {
     def isSubtypeOf(typ: Type): Boolean =
       this == typ || parent.exists(t => t == typ || t.isSubtypeOf(typ))
 
-    override def toString = name
-    override def inlineRepresentation = name
-    override def fullRepresentation = s"type $name" + { if(parent.isDefined) " < "+parent.get else "" }
+    override def toString = id.toString
   }
 
 
@@ -36,7 +31,7 @@ package object model {
       StateVariable(this, variables)
     }
 
-    override def toString = s"$name(${params.mkString(", ")})->${typ.name}"
+    override def toString = s"$name(${params.mkString(", ")})->${typ.id}"
   }
 
   case class StateVariable(template: StateVariableTemplate, params: Seq[Var]) extends ModuleElem {
@@ -57,9 +52,6 @@ package object model {
   trait Var extends Elem {
     def id: Id
     def typ: Type
-
-    override def inlineRepresentation = id.toString
-    override def fullRepresentation = s"$typ $id"
   }
   object Var {
     def unapply(v: Var)= Option(v.id, v.typ)
@@ -76,9 +68,7 @@ package object model {
   }
 
   /** Instance of a given type, result of the ANML statement "instance Type id;" */
-  case class Instance(id: Id, typ: Type) extends Var with ModuleElem {
-    override def fullRepresentation = s"instance $typ $id"
-  }
+  case class Instance(id: Id, typ: Type) extends Var with ModuleElem
   case class InstanceDeclaration(instance: Instance) extends VarDeclaration[Instance] {
     override def variable = instance
     override def toString = s"instance ${instance.typ} ${instance.id}"
@@ -86,7 +76,7 @@ package object model {
 
   /** Denote the argument of the template of state variables and actions. */
   case class Arg(id: Id, typ: Type) extends Var {
-    override def toString = s"${typ.name} $id"
+    override def toString = s"${typ.id} $id"
   }
   case class ArgDeclaration(arg: Arg) extends VarDeclaration[Arg] {
     override def variable = arg
@@ -110,8 +100,6 @@ package object model {
       case d if d > 0 => s"+$d"
       case d if d < 0 => s"-${-d}"
     })
-    override def inlineRepresentation = toString
-    override def fullRepresentation = s"timepoint "+toString
 
     def +(delay: Int) = TPRef(id, this.delay + delay)
     def -(delay: Int) = TPRef(id, this.delay - delay)
@@ -165,7 +153,7 @@ package object model {
         .orElse(parent.flatMap(_.findTimepoint(name)))
 
     def findType(name: String): Option[Type] =
-      elems.collect { case t@Type(`name`, _) => t }
+      elems.collect { case t@Type(Id(_, `name`), _) => t }
       .headOption
       .orElse(parent.flatMap(_.findType(name)))
   }
@@ -187,7 +175,7 @@ package object model {
       "module:\n" +
         elems
           .filter(!Parser.baseAnmlModel.elems.contains(_))
-          .map("  "+_.fullRepresentation)
+          .map("  "+_)
           .reverse
           .mkString("\n")
   }

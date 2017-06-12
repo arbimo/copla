@@ -53,7 +53,7 @@ object Parser {
         .!
       ~ ("<" ~/ declaredType(c).!).asInstanceOf[Parser[Type]].?
       ~ ";")
-      .map { case (name, parentOpt) => Type(name, parentOpt) }
+      .map { case (name, parentOpt) => Type(c.id(name), parentOpt) }
       .opaque("type-declaration")
 
   /** Parser for instance declaration.
