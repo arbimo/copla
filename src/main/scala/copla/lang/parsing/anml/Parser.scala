@@ -103,16 +103,16 @@ object Parser {
     ("(" ~ (distinctArgSeq(m, ",") | PassWith(Seq())) ~ ")") | // parenthesis with and without args
       PassWith(Seq()) // no args no, parenthesis
 
-  def stateVariableDeclaration(m: Model): Parser[StateVariableTemplate] =
+  def fluentDeclaration(m: Model): Parser[FluentDeclaration] =
     (fluentKW ~/ declaredType(m) ~ freeIdent(m) ~ args(m) ~ ";")
       .map {
         case (typ, svName, args) =>
-          StateVariableTemplate(svName, typ, args.map {
+          FluentTemplate(m.id(svName), typ, args.map {
             case (name, argType) => Arg(Id(m.scope + svName, name), argType)
-          })
-      }
+          })}
+      .map(FluentDeclaration(_))
 
-  def timepointDeclation(c: Ctx): Parser[TimepointDeclaration] =
+  def timepointDeclaration(c: Ctx): Parser[TimepointDeclaration] =
     timepointKW ~/
       freeIdent(c).map(name => TimepointDeclaration(TPRef(c.id(name)))) ~
       ";"
@@ -120,8 +120,8 @@ object Parser {
   def elem(m: Model): Parser[Seq[ModuleElem]] =
     typeDeclaration(m).map(Seq(_)) |
       instancesDeclaration(m) |
-      stateVariableDeclaration(m).map(Seq(_)) |
-      timepointDeclation(m).map(Seq(_))
+      fluentDeclaration(m).map(Seq(_)) |
+      timepointDeclaration(m).map(Seq(_))
 
   def anmlParser(mod: Model): Parser[Model] =
     End ~ PassWith(mod) |

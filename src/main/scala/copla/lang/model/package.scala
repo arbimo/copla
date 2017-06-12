@@ -28,18 +28,22 @@ package object model {
 
 
 
-  case class StateVariableTemplate(name: String, typ: Type, params: Seq[Arg]) extends ModuleElem {
+  case class FluentTemplate(id: Id, typ: Type, params: Seq[Arg]) {
 
-    def apply(variables: Var*): StateVariable = {
+    def apply(variables: Var*): Fluent = {
       require(params.size == variables.size,
-              s"Wrong number of arguments for state variable, $name")
-      StateVariable(this, variables)
+              s"Wrong number of arguments for state variable, $id")
+      Fluent(this, variables)
     }
 
-    override def toString = s"$name(${params.mkString(", ")})->${typ.id}"
+    override def toString = id.toString
+  }
+  case class FluentDeclaration(fluent: FluentTemplate) extends Declaration[FluentTemplate] with ModuleElem {
+    override def id = fluent.id
+    override def toString = s"fluent ${fluent.typ} ${fluent.id}(${fluent.params.mkString(", ")})"
   }
 
-  case class StateVariable(template: StateVariableTemplate, params: Seq[Var]) extends ModuleElem {
+  case class Fluent(template: FluentTemplate, params: Seq[Var]) extends ModuleElem {
     require(template.params.size == params.size)
     template.params.zip(params).foreach {
       case (tpl, v) =>
@@ -51,7 +55,7 @@ package object model {
 //    def ===(transition: Transition): InnerTransitionAssertion =
 //      InnerTransitionAssertion(this, transition.vStart, transition.vEnd)
 
-    override def toString = s"${template.name}(${params.mkString(", ")})"
+    override def toString = s"$template(${params.mkString(", ")})"
   }
 
   trait Var {
