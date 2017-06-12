@@ -17,7 +17,13 @@ class AnmlParsingTest extends FunSuite {
     "type A; type B; fluent A sv(A first, B second);",
     "type A; fluent A sv;",
     "type A; fluent A sv();",
-    "type A; instance A x; fluent A sv(A x);" // shadowing allowed (might benefit from warning
+    "type A; instance A x; fluent A sv(A x);", // shadowing allowed (might benefit from warning)
+    "start < end;",
+    "duration == 10;",
+    "end - start == 10;",
+    "timepoint t; t < 100;",
+    "start -10  ==  end+5;",
+    "start -10 -end +2 < 0;"
   )
 
   def invalid = Seq(
@@ -33,7 +39,9 @@ class AnmlParsingTest extends FunSuite {
     "fluent A sv;",
     "type A; fluent A sv(B b);",
     "type A; fluent A sv(A)",
-    "type A; instance A sv; fluent A sv(A x)"
+    "type A; instance A sv; fluent A sv(A x)",
+    "start < x;",
+    "timepoint t; start - end < t;"
   )
 
   for(anml <- valid) {
@@ -60,7 +68,7 @@ class AnmlParsingTest extends FunSuite {
   }
 
 
-  val tmp = "type a < a;"
+  val tmp = "start < end;"
   test("debug: temporary") {
     /** Dummy text to facilitate testing. */
     println(tmp)

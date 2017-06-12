@@ -97,8 +97,9 @@ package object model {
     def <(dur: Int)  = to < from + dur
     def >=(dur: Int) = to >= from + dur
     def >(dur: Int)  = to > from + dur
-    def +(time: Int) = Delay(from, to + 1)
-    def -(time: Int) = Delay(from, to - 1)
+    def +(time: Int) = Delay(from, to + time)
+    def -(time: Int) = Delay(from, to - time)
+    def ===(dur: Int) = Seq(this <= dur, this >= dur)
   }
 
   /** A timepoint, declared when appearing in the root of a context.*/
@@ -114,9 +115,12 @@ package object model {
     def -(delay: Int) = TPRef(id, this.delay - delay)
 
     def <=(other: TPRef) = TBefore(this, other)
-    def <(other: TPRef)  = TBefore(this, other + 1)
+    def <(other: TPRef)  = TBefore(this, other - 1)
     def >=(other: TPRef) = other <= this
     def >(other: TPRef)  = other < this
+    def ===(other: TPRef) = Seq(this <= other, this >= other)
+
+    def -(other: TPRef) = Delay(other, this)
   }
   case class TimepointDeclaration(tp: TPRef) extends Declaration[TPRef] with ModuleElem {
     require(tp.delay == 0, "Cannot declare a relative timepoint.")
@@ -124,7 +128,7 @@ package object model {
     override def toString = s"timepoint $id"
   }
 
-  case class TBefore(from: TPRef, to: TPRef) extends Elem with Statement {
+  case class TBefore(from: TPRef, to: TPRef) extends Statement {
     override def toString: String = s"$from <= $to"
   }
 
@@ -144,6 +148,7 @@ package object model {
     def elems: Seq[Elem]
     def parent: Option[Ctx]
     def name: String
+    def root: Ctx = parent match { case Some(p) => p.root case None => this }
 
     val scope: Scope = parent.map(_.scope +name).getOrElse(Scope(Seq(name)))
 
