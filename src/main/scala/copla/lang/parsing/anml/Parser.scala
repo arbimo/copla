@@ -17,10 +17,9 @@ object Parser {
   import White._
 
   val word: Parser[String] = {
-    import fastparse.all._ // sequence composition to ignore white spaces
-    (CharIn(('a' to 'z') ++ ('A' to 'Z')) ~ CharsWhileIn(
-      ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9'),
-      min = 0)).!
+    import fastparse.all._ // override sequence composition to ignore white spaces
+    (CharIn(('a' to 'z') ++ ('A' to 'Z')) ~
+      CharsWhileIn(('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9'), min = 0)).!
   }
   val typeKW: Parser[Unit] = word.filter(_ == "type").map(x => {}).opaque("type")
   val instanceKW           = word.filter(_ == "instance").map(_ => {}).opaque("instance")
@@ -40,8 +39,10 @@ object Parser {
 
   def declaredType(c: Model): Parser[Type] =
     typeName
-      .filter(c.findType(_).isDefined)
-      .map(t => c.findType(t).get)
+      .flatMap(c.findType(_) match {
+        case Some(t) => PassWith(t)
+        case None    => Fail
+      })
       .opaque("previously-declared-type")
 
   def typeDeclaration(c: Model): Parser[Type] =
@@ -55,7 +56,7 @@ object Parser {
       .map { case (name, parentOpt) => Type(name, parentOpt) }
       .opaque("type-declaration")
 
-  /** Parser for isntance declaration.
+  /** Parser for instance declaration.
     * "instance Type id1, id2, id3;" */
   def instancesDeclaration(m: Model): Parser[Seq[Instance]] = {
 
@@ -92,12 +93,12 @@ object Parser {
       .flatMap(a =>
         (Pass ~ sep ~/ distinctArgSeq(m, sep, previous :+ a)) | PassWith(previous :+ a))
 
-  /** Parses a sequence of args necessarilly enclosed in parenthesis if non empty
+  /** Parses a sequence of args necessarily enclosed in parenthesis if non empty
     * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
     */
   protected def args(m: Model): Parser[Seq[(String, Type)]] =
-    ("(" ~ (distinctArgSeq(m, ",") | PassWith(Seq())) ~ ")") | // parenthesis with and withour args
-      PassWith(Seq()) // no args no parenthesis
+    ("(" ~ (distinctArgSeq(m, ",") | PassWith(Seq())) ~ ")") | // parenthesis with and without args
+      PassWith(Seq()) // no args no, parenthesis
 
   def stateVariableDeclaration(m: Model): Parser[StateVariableTemplate] =
     (fluentKW ~/ declaredType(m) ~ ident.filter(isFree(_, m)) ~ args(m) ~ ";")
@@ -107,11 +108,9 @@ object Parser {
             case (name, argType) => Arg(Id(m.scope + svName, name), argType)
           })
       }
-      .opaque("state-variable-declaration")
 
   def timepointDeclation(c: Ctx): Parser[TPRef] =
-    (timepointKW ~/ ident.filter(isFree(_, c)).map(name => TPRef(c.id(name))) ~ ";")
-      .opaque("timepoint-declaration")
+    timepointKW ~/ ident.filter(isFree(_, c)).map(name => TPRef(c.id(name))) ~ ";"
 
   def elem(m: Model): Parser[Seq[ModuleElem]] =
     typeDeclaration(m).map(Seq(_)) |
@@ -120,7 +119,7 @@ object Parser {
       timepointDeclation(m).map(Seq(_))
 
   def anmlParser(mod: Model): Parser[Model] =
-    End.map(_ => mod) |
+    End ~ PassWith(mod) |
       (Pass ~ elem(mod) ~ Pass).flatMap(elem =>
         mod ++ elem match {
           case Some(extended) => anmlParser(extended)
