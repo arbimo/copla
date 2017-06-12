@@ -33,9 +33,11 @@ object Parser {
   val typeName: Parser[String] = word.filter(!keywords.contains(_)).opaque("type-name")
   val variableName             = ident.opaque("variable-name")
 
-  def isFree(id: String, c: Ctx) =
-    c.findType(id).orElse(c.findTimepoint(id)).orElse(c.findVariable(id)).isEmpty &&
-      !keywords.contains(id)
+  def freeIdent(c: Ctx) =
+    ident
+      .filter(!keywords.contains(_))
+      .filter(name => c.elems.collect { case d:Declaration[_] => d }.forall(name != _.id.name))
+      .opaque("free-ident")
 
   def declaredType(c: Model): Parser[Type] =
     typeName
@@ -45,28 +47,27 @@ object Parser {
       })
       .opaque("previously-declared-type")
 
-  def typeDeclaration(c: Model): Parser[Type] =
+  def typeDeclaration(c: Model): Parser[TypeDeclaration] =
     (typeKW ~/
-      typeName
-        .filter(isFree(_, c))
+      freeIdent(c)
         .opaque("previously-undefined-type")
         .!
       ~ ("<" ~/ declaredType(c).!).asInstanceOf[Parser[Type]].?
       ~ ";")
       .map { case (name, parentOpt) => Type(c.id(name), parentOpt) }
+      .map(TypeDeclaration(_))
       .opaque("type-declaration")
 
   /** Parser for instance declaration.
     * "instance Type id1, id2, id3;" */
-  def instancesDeclaration(m: Model): Parser[Seq[Instance]] = {
+  def instancesDeclaration(m: Model): Parser[Seq[InstanceDeclaration]] = {
 
     /** Parses a sequences of yet unused *distinct* identifiers. */
     def distinctFreeIdents(m: Model,
                            previous: Seq[String],
                            sep: String,
                            term: String): Parser[Seq[String]] =
-      Pass ~ ident
-        .filter(isFree(_, m))
+      Pass ~ freeIdent(m)
         .filter(!previous.contains(_))
         .opaque("free-identifier")
         .flatMap(name =>
@@ -75,7 +76,9 @@ object Parser {
 
     (instanceKW ~/ declaredType(m) ~/ distinctFreeIdents(m, Nil, ",", ";"))
       .map { case (typ, instanceNames) => instanceNames.map(name => Instance(m.id(name), typ)) }
-  }.opaque("instance declaration")
+  }
+    .map(instances => instances.map(InstanceDeclaration(_)))
+    .opaque("instance declaration")
 
   protected def arg(m: Model): Parser[(String, Type)] =
     (declaredType(m) ~ ident.filter(!keywords.contains(_)))
@@ -101,7 +104,7 @@ object Parser {
       PassWith(Seq()) // no args no, parenthesis
 
   def stateVariableDeclaration(m: Model): Parser[StateVariableTemplate] =
-    (fluentKW ~/ declaredType(m) ~ ident.filter(isFree(_, m)) ~ args(m) ~ ";")
+    (fluentKW ~/ declaredType(m) ~ freeIdent(m) ~ args(m) ~ ";")
       .map {
         case (typ, svName, args) =>
           StateVariableTemplate(svName, typ, args.map {
@@ -109,8 +112,10 @@ object Parser {
           })
       }
 
-  def timepointDeclation(c: Ctx): Parser[TPRef] =
-    timepointKW ~/ ident.filter(isFree(_, c)).map(name => TPRef(c.id(name))) ~ ";"
+  def timepointDeclation(c: Ctx): Parser[TimepointDeclaration] =
+    timepointKW ~/
+      freeIdent(c).map(name => TimepointDeclaration(TPRef(c.id(name)))) ~
+      ";"
 
   def elem(m: Model): Parser[Seq[ModuleElem]] =
     typeDeclaration(m).map(Seq(_)) |

@@ -14,11 +14,16 @@ package object model {
     def id: Id
   }
 
-  case class Type(id: Id, parent: Option[Type]) extends ModuleElem {
+  case class Type(id: Id, parent: Option[Type]) {
     def isSubtypeOf(typ: Type): Boolean =
       this == typ || parent.exists(t => t == typ || t.isSubtypeOf(typ))
 
     override def toString = id.toString
+  }
+  case class TypeDeclaration(typ: Type) extends Declaration[Type] with ModuleElem {
+    override def id = typ.id
+    override def toString = s"type $id" +
+      { if(typ.parent.isDefined) " < "+typ.parent.get else ""}
   }
 
 
@@ -49,7 +54,7 @@ package object model {
     override def toString = s"${template.name}(${params.mkString(", ")})"
   }
 
-  trait Var extends Elem {
+  trait Var {
     def id: Id
     def typ: Type
   }
@@ -62,14 +67,14 @@ package object model {
   }
 
   /** Variable declared locally */
-  case class LocalVar(id: Id, typ: Type) extends Var with ModuleElem
-  case class LocalVarDeclaration(variable: LocalVar) extends VarDeclaration[LocalVar] {
+  case class LocalVar(id: Id, typ: Type) extends Var
+  case class LocalVarDeclaration(variable: LocalVar) extends VarDeclaration[LocalVar] with ModuleElem {
     override def toString = s"constant ${variable.typ} ${variable.id}"
   }
 
   /** Instance of a given type, result of the ANML statement "instance Type id;" */
-  case class Instance(id: Id, typ: Type) extends Var with ModuleElem
-  case class InstanceDeclaration(instance: Instance) extends VarDeclaration[Instance] {
+  case class Instance(id: Id, typ: Type) extends Var
+  case class InstanceDeclaration(instance: Instance) extends VarDeclaration[Instance] with ModuleElem {
     override def variable = instance
     override def toString = s"instance ${instance.typ} ${instance.id}"
   }
@@ -93,7 +98,7 @@ package object model {
   }
 
   /** A timepoint, declared when appearing in the root of a context.*/
-  case class TPRef(id: Id, delay: Int = 0) extends ModuleElem {
+  case class TPRef(id: Id, delay: Int = 0) {
 
     override def toString = id.toString + (delay match {
       case 0 => ""
@@ -109,7 +114,7 @@ package object model {
     def >=(other: TPRef) = other <= this
     def >(other: TPRef)  = other < this
   }
-  case class TimepointDeclaration(tp: TPRef) extends Declaration[TPRef] {
+  case class TimepointDeclaration(tp: TPRef) extends Declaration[TPRef] with ModuleElem {
     require(tp.delay == 0, "Cannot declare a relative timepoint.")
     override def id = tp.id
     override def toString = s"timepoint $id"
@@ -148,12 +153,12 @@ package object model {
 
     def findTimepoint(name: String): Option[TPRef] =
       elems
-        .collect { case x @ TPRef(Id(_, `name`), _) => x }
+        .collect { case TimepointDeclaration(tp) if tp.id.name == name => tp }
         .headOption
         .orElse(parent.flatMap(_.findTimepoint(name)))
 
     def findType(name: String): Option[Type] =
-      elems.collect { case t@Type(Id(_, `name`), _) => t }
+      elems.collect { case TypeDeclaration(t) if t.id.name == name => t }
       .headOption
       .orElse(parent.flatMap(_.findType(name)))
   }
