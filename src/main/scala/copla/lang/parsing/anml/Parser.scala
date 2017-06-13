@@ -2,6 +2,7 @@ package copla.lang.parsing.anml
 
 import copla.lang.model._
 import fastparse.core.Parsed.{Failure, Success}
+import fastparse.parsers.Transformers.Filtered
 
 object Parser {
 
@@ -19,7 +20,7 @@ object Parser {
   val word: Parser[String] = {
     import fastparse.all._ // override sequence composition to ignore white spaces
     (CharIn(('a' to 'z') ++ ('A' to 'Z')) ~
-      CharsWhileIn(('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9'), min = 0)).!
+      CharsWhileIn(('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9'), min = 0)).!.opaque("word")
   }
   val int: Parser[Int] = CharsWhileIn('0' to '9').!.map(_.toInt).opaque("int")
 
@@ -32,34 +33,33 @@ object Parser {
   val reservedTypeNames    = Set()
   val nonIdent             = keywords ++ reservedTypeNames
 
-  val ident                    = word.filter(!nonIdent.contains(_)).opaque("identifier")
+  val ident                    = word.opaque("ident").filter(f(!nonIdent.contains(_), "not-reserved"))
   val typeName: Parser[String] = word.filter(!keywords.contains(_)).opaque("type-name")
   val variableName             = ident.opaque("variable-name")
 
+  /** Simple wrapper to attach a toString method to a function */
+  private[this] def f[T, V](f: T => V, str: String) = new Function[T, V] {
+    def apply(v: T)       = f(v)
+    override def toString = str
+  }
+
   def freeIdent(c: Ctx) =
-    ident
-      .filter(!keywords.contains(_))
-      .filter(name => c.elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name))
-      .opaque("free-ident")
+    ident.filter(
+      f(name => c.elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name),
+        "unused"))
 
   def declaredType(c: Model): Parser[Type] =
     typeName
-      .flatMap(c.findType(_) match {
-        case Some(t) => PassWith(t)
-        case None    => Fail
-      })
-      .opaque("previously-declared-type")
+      .filter(f(c.findType(_).isDefined, "declared"))
+      .map(c.findType(_).get)
 
   def typeDeclaration(c: Model): Parser[TypeDeclaration] =
     (typeKW ~/
       freeIdent(c)
-        .opaque("previously-undefined-type")
-        .!
       ~ ("<" ~/ declaredType(c).!).asInstanceOf[Parser[Type]].?
       ~ ";")
       .map { case (name, parentOpt) => Type(c.id(name), parentOpt) }
       .map(TypeDeclaration(_))
-      .opaque("type-declaration")
 
   /** Parser for instance declaration.
     * "instance Type id1, id2, id3;" */
@@ -71,8 +71,7 @@ object Parser {
                            sep: String,
                            term: String): Parser[Seq[String]] =
       Pass ~ freeIdent(m)
-        .filter(!previous.contains(_))
-        .opaque("free-identifier")
+        .filter(f(!previous.contains(_), "not-in-same-instance-list"))
         .flatMap(name =>
           Pass ~ sep ~/ distinctFreeIdents(m, previous :+ name, sep, term)
             | Pass ~ term ~ PassWith(previous :+ name))
@@ -80,21 +79,18 @@ object Parser {
     (instanceKW ~/ declaredType(m) ~/ distinctFreeIdents(m, Nil, ",", ";"))
       .map { case (typ, instanceNames) => instanceNames.map(name => Instance(m.id(name), typ)) }
   }.map(instances => instances.map(InstanceDeclaration(_)))
-    .opaque("instance declaration")
 
   protected def arg(m: Model): Parser[(String, Type)] =
-    (declaredType(m) ~ ident.filter(!keywords.contains(_)))
-      .opaque("argument-declaration")
+    (declaredType(m) ~ ident)
       .map { case (typ, argName) => (argName, typ) }
 
-  /** A liest of at least one argument formatted as "Type1 arg, Type2 arg2" */
+  /** A list of at least one argument formatted as "Type1 arg, Type2 arg2" */
   protected def distinctArgSeq(
       m: Model,
       sep: String,
       previous: Seq[(String, Type)] = Seq()): Parser[Seq[(String, Type)]] =
     Pass ~ arg(m)
-      .filter(a => !previous.exists(_._1 == a._1)) // disallow args with same name
-      .opaque("args")
+      .filter(f(a => !previous.exists(_._1 == a._1), "not-used-in-current-arg-sequence"))
       .flatMap(a =>
         (Pass ~ sep ~/ distinctArgSeq(m, sep, previous :+ a)) | PassWith(previous :+ a))
 
@@ -102,8 +98,9 @@ object Parser {
     * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
     */
   protected def args(m: Model): Parser[Seq[(String, Type)]] =
-    ("(" ~ (distinctArgSeq(m, ",") | PassWith(Seq())
-      .opaque("no-arg")) ~ ")") | // parenthesis with and without args
+    ("(" ~/
+      ((&(word) ~/ distinctArgSeq(m, ",")) | PassWith(Seq()).opaque("no-args")) ~
+      ")") | // parenthesis with and without args
       PassWith(Seq()).opaque("no-args") // no args no, parenthesis
 
   def fluentDeclaration(m: Model): Parser[FluentDeclaration] =
@@ -123,12 +120,8 @@ object Parser {
 
   protected def definedTP(c: Ctx): Parser[TPRef] =
     ident
-      .map(c.findTimepoint)
-      .flatMap {
-        case Some(tp) => PassWith(tp)
-        case None     => Fail
-      }
-      .opaque("declared-timepoint")
+      .filter(f(c.findTimepoint(_).isDefined, "declared-timepoint"))
+      .map(c.findTimepoint(_).get)
 
   def timepoint(c: Ctx): Parser[TPRef] = {
     (int ~ "+").flatMap(d => timepoint(c).map(tp => tp + d)) |
@@ -162,7 +155,7 @@ object Parser {
       }
 
   def temporalConstraint(c: Ctx): Parser[Seq[TBefore]] = {
-    (timepoint(c) ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~ timepoint(c) ~ ";")
+    (timepoint(c) ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~/ timepoint(c) ~ ";")
       .map {
         case (t1, "<", t2)                                     => Seq(t1 < t2)
         case (t1, "<=", t2)                                    => Seq(t1 <= t2)
@@ -171,7 +164,7 @@ object Parser {
         case (t1, eq, t2) if Set("=", "==", ":=").contains(eq) => t1 === t2
         case _                                                 => sys.error("Buggy parser implementation")
       } |
-      (delay(c) ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~ int ~ ";")
+      (delay(c) ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~/ int ~ ";")
         .map {
           case (d, "<", t)                                     => Seq(d < t)
           case (d, "<=", t)                                    => Seq(d <= t)
@@ -183,18 +176,14 @@ object Parser {
   }
 
   def variable(c: Ctx): Parser[Var] =
-    ident.flatMap(name =>
-      c.findVariable(name) match {
-        case Some(v) => PassWith(v)
-        case None    => println(c.elems.mkString("\n")); Fail.opaque(s"fail:no variable $name")
-    })
+    ident
+      .filter(f(c.findVariable(_).isDefined, "declared-variable"))
+      .map(c.findVariable(_).get)
 
   def fluent(c: Ctx): Parser[FluentTemplate] =
-    ident.flatMap(name =>
-      c.findFluent(name) match {
-        case Some(v) => PassWith(v)
-        case None    => Fail.opaque(s"fail:fluent not found: $name")
-    })
+    ident
+      .filter(f(c.findFluent(_).isDefined, "declared-fluent"))
+      .map(c.findFluent(_).get)
 
   def timedSymExpr(c: Ctx): Parser[TimedSymExpr] = {
     def varList(c: Ctx,
