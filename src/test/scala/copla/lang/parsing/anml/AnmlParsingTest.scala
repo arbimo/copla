@@ -24,7 +24,9 @@ class AnmlParsingTest extends FunSuite {
     "end - start == 10;",
     "timepoint t; t < 100;",
     "start -10  ==  end+5;",
-    "start -10 -end +2 < 0;"
+    "start -10 -end +2 < 0;",
+    "type A; type B; fluent A f(B b); instance A a1; instance B b1; [start,end] f(b1) == a1;",
+    "type A; type B; fluent A f(B b); instance A a1; instance B b1; [start,end] id: f(b1) == a1; [start+10, 20] f(b1) == a1;"
   )
 
   def invalid = Seq(
@@ -68,6 +70,14 @@ class AnmlParsingTest extends FunSuite {
     }
   }
 
+  test("performance") {
+    for(i <- 0 to 100) {
+      for(input <- valid) {
+        Parser.parse(input)
+      }
+    }
+  }
+
   test("timed-expression") {
     val ctx  = "type A; type B; fluent A f(B b, B x); instance B b1, b2;"
     val mod  = Parser.parse(ctx).get.value
@@ -82,7 +92,8 @@ class AnmlParsingTest extends FunSuite {
     }
   }
 
-  val tmp = "start < end;"
+  val tmp =
+    "type A; type B; fluent A f(B b); instance A a1; instance B b1; [start,end] f(b1) == a1;"
   test("debug: temporary") {
 
     /** Dummy text to facilitate testing. */

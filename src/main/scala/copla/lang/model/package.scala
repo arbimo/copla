@@ -3,9 +3,13 @@ package copla.lang
 import copla.lang.parsing.anml.Parser
 import exception._
 
+import scala.collection.mutable
+
 package object model {
 
   val reservedPrefix = "__"
+  private[this] var nextID = 0
+  def defaultId(): String = reservedPrefix + { nextID+=1; nextID-1 }
 
   trait Elem
   trait ModuleElem extends Elem
@@ -13,7 +17,7 @@ package object model {
   trait SymExpr extends Elem {
     def typ: Type
   }
-  trait TimedSymExpr  extends SymExpr {}
+  trait TimedSymExpr  extends SymExpr
   trait StaticSymExpr extends SymExpr
 
   abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx {
@@ -28,7 +32,10 @@ package object model {
       extends TimedAssertion(parent, name) {
     override def toString =
       if (name.startsWith(reservedPrefix)) s"$left == $right"
-      else s"$name : $left == $right"
+      else s"$name: $left == $right"
+  }
+  case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion) extends ModuleElem {
+    override def toString = s"$interval $assertion"
   }
 
   trait Declaration[T] {
@@ -215,7 +222,7 @@ package object model {
         .orElse(parent.flatMap(_.findFluent(name)))
   }
 
-  case class Model(elems: Seq[ModuleElem] = Seq()) extends Ctx {
+  case class Model(elems: Seq[ModuleElem] = mutable.Buffer()) extends Ctx {
     override def parent = None
     override def name   = "_module_"
     override val scope  = Scope(Seq()) // root scope

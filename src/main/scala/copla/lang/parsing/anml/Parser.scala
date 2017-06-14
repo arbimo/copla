@@ -211,12 +211,31 @@ object Parser {
     })
   }
 
+  def staticSymExpr(c: Ctx): Parser[StaticSymExpr] =
+    variable(c)
+
+  def symExpr(c: Ctx): Parser[SymExpr] =
+    timedSymExpr(c)
+
+  def interval(c: Ctx): Parser[Interval] =
+    ("[" ~/ timepoint(c) ~ "," ~/ timepoint(c) ~ "]").map {
+      case (tp1, tp2) => Interval(tp1, tp2)
+    }
+
+  def temporallyQualifiedAssertion(c: Ctx): Parser[TemporallyQualifiedAssertion] = {
+    def assertionId(c: Ctx): Parser[String] =
+      (freeIdent(c) ~ ":" ~/ Pass) | PassWith(defaultId())
+    (interval(c) ~/ assertionId(c) ~ timedSymExpr(c) ~ "==" ~/ staticSymExpr(c) ~ ";")
+      .map { case (it, id, left, right) => TemporallyQualifiedAssertion(it, TimedEqualAssertion(left, right, Some(c), id))}
+  }
+
   def elem(m: Model): Parser[Seq[ModuleElem]] =
     typeDeclaration(m).map(Seq(_)) |
       instancesDeclaration(m) |
       fluentDeclaration(m).map(Seq(_)) |
       timepointDeclaration(m).map(Seq(_)) |
-      temporalConstraint(m)
+      temporalConstraint(m) |
+      temporallyQualifiedAssertion(m).map(Seq(_))
 
   def anmlParser(mod: Model): Parser[Model] =
     End ~ PassWith(mod) |
