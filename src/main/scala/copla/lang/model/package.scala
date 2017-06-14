@@ -23,7 +23,6 @@ package object model {
   abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx {
     val elems = Seq(TimepointDeclaration(TPRef(this.id("start"))),
                     TimepointDeclaration(TPRef(this.id("end"))))
-
   }
   case class TimedEqualAssertion(left: TimedSymExpr,
                                  right: StaticSymExpr,

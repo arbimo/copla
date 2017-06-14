@@ -227,15 +227,22 @@ abstract class AnmlParser(val initialContext: Ctx) {
       case (tp1, tp2) => Interval(tp1, tp2)
     }
 
-  val temporallyQualifiedAssertion: Parser[TemporallyQualifiedAssertion] = {
+  val timedAssertion: Parser[TimedAssertion] = {
+    /** Read an identifier or construct a default one otherwise */
     val assertionId: Parser[String] =
       (freeIdent ~ ":" ~/ Pass) | PassWith(defaultId())
-    (interval ~/ assertionId ~ timedSymExpr ~ "==" ~/ staticSymExpr ~ ";")
-      .map {
-        case (it, id, left, right) =>
-          TemporallyQualifiedAssertion(it,
-                                       TimedEqualAssertion(left, right, Some(currentContext), id))
-      }
+
+    assertionId ~
+      (timedSymExpr ~ "==" ~/ staticSymExpr).filter(f({
+        case (left, right) => left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
+      }, "equality-between-compatible-types"))
+  }.map {
+    case (id, (left, right)) => TimedEqualAssertion(left, right, Some(currentContext), id)
+  }
+
+  val temporallyQualifiedAssertion: Parser[TemporallyQualifiedAssertion] = {
+    (interval ~/ timedAssertion ~ ";")
+      .map { case (it, assertion) => TemporallyQualifiedAssertion(it, assertion) }
   }
 
   val elem: Parser[Seq[ModuleElem]] =

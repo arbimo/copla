@@ -44,7 +44,9 @@ class AnmlParsingTest extends FunSuite {
     "type A; fluent A sv(A)",
     "type A; instance A sv; fluent A sv(A x)",
     "start < x;",
-    "timepoint t; start - end < t;"
+    "timepoint t; start - end < t;",
+    "type A; type B; fluent A f(A a); instance A a1; instance B b1; [start,end] f(a1) == b1;",
+    "type A; type B; fluent A f(B b); instance A a1; instance B b1; [start,end] id: f(b1) == a2;"
   )
 
   for (anml <- valid) {
