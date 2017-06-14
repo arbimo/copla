@@ -193,16 +193,14 @@ object Parser {
       if (expectedTypes.isEmpty) {
         PassWith(previous)
       } else {
-        variable(c).flatMap(v => {
-          if (v.typ.isSubtypeOf(expectedTypes.head)) {
-            if (expectedTypes.tail.isEmpty)
+        variable(c)
+          .filter(f(_.typ.isSubtypeOf(expectedTypes.head), "has-expected-type"))
+          .flatMap(v =>
+            if(expectedTypes.tail.isEmpty)
               PassWith(previous :+ v)
             else
               Pass ~ sep ~/ varList(c, expectedTypes.tail, sep, previous :+ v)
-          } else {
-            Fail.opaque(s"fail:wrong type for var $v (${v.typ}), expecting ${expectedTypes.head}")
-          }
-        })
+          )
       }
     }
     (fluent(c) ~/ Pass).flatMap(f =>
