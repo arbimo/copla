@@ -2,16 +2,28 @@ package copla.lang.parsing.anml
 
 import copla.lang.model._
 import fastparse.core.Parsed.{Failure, Success}
-import fastparse.parsers.Transformers.Filtered
 
-object Parser {
+abstract class AnmlParser(val initialContext: Ctx) {
+  private[this] var updatableContext = initialContext
+  def updateContext(newContext: Ctx) {
+    updatableContext = newContext
+  }
 
-  import fastparse.WhitespaceApi
-  val whiteChars = " \r\n\t"
+  def currentContext = updatableContext
+  def elems          = currentContext.elems
+  def scope          = currentContext.scope
+  def parent         = currentContext.parent
+  def root           = currentContext.root
 
-  val White = WhitespaceApi.Wrapper {
+  def id(name: String): Id                             = Id(scope, name)
+  def findVariable(name: String): Option[Var]          = currentContext.findVariable(name)
+  def findTimepoint(name: String): Option[TPRef]       = currentContext.findTimepoint(name)
+  def findType(name: String): Option[Type]             = currentContext.findType(name)
+  def findFluent(name: String): Option[FluentTemplate] = currentContext.findFluent(name)
+
+  val White = fastparse.WhitespaceApi.Wrapper {
     import fastparse.all._
-    val white = CharsWhileIn(whiteChars)
+    val white = CharsWhileIn(" \r\n\t")
     NoTrace(white.rep)
   }
   import fastparse.noApi._
@@ -43,89 +55,83 @@ object Parser {
     override def toString = str
   }
 
-  def freeIdent(c: Ctx) =
+  val freeIdent =
     ident.filter(
-      f(name => c.elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name),
-        "unused"))
+      f(name => elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name), "unused"))
 
-  def declaredType(c: Model): Parser[Type] =
+  val declaredType: Parser[Type] =
     typeName
-      .filter(f(c.findType(_).isDefined, "declared"))
-      .map(c.findType(_).get)
+      .filter(f(findType(_).isDefined, "declared"))
+      .map(findType(_).get)
 
-  def typeDeclaration(c: Model): Parser[TypeDeclaration] =
+  val typeDeclaration: Parser[TypeDeclaration] =
     (typeKW ~/
-      freeIdent(c)
-      ~ ("<" ~/ declaredType(c).!).asInstanceOf[Parser[Type]].?
+      freeIdent
+      ~ ("<" ~/ declaredType.!).asInstanceOf[Parser[Type]].?
       ~ ";")
-      .map { case (name, parentOpt) => Type(c.id(name), parentOpt) }
+      .map { case (name, parentOpt) => Type(id(name), parentOpt) }
       .map(TypeDeclaration(_))
 
   /** Parser for instance declaration.
     * "instance Type id1, id2, id3;" */
-  def instancesDeclaration(m: Model): Parser[Seq[InstanceDeclaration]] = {
+  val instancesDeclaration: Parser[Seq[InstanceDeclaration]] = {
 
     /** Parses a sequences of yet unused *distinct* identifiers. */
-    def distinctFreeIdents(m: Model,
-                           previous: Seq[String],
-                           sep: String,
-                           term: String): Parser[Seq[String]] =
-      Pass ~ freeIdent(m)
+    def distinctFreeIdents(previous: Seq[String], sep: String, term: String): Parser[Seq[String]] =
+      Pass ~ freeIdent
         .filter(f(!previous.contains(_), "not-in-same-instance-list"))
         .flatMap(name =>
-          Pass ~ sep ~/ distinctFreeIdents(m, previous :+ name, sep, term)
+          Pass ~ sep ~/ distinctFreeIdents(previous :+ name, sep, term)
             | Pass ~ term ~ PassWith(previous :+ name))
 
-    (instanceKW ~/ declaredType(m) ~/ distinctFreeIdents(m, Nil, ",", ";"))
-      .map { case (typ, instanceNames) => instanceNames.map(name => Instance(m.id(name), typ)) }
+    (instanceKW ~/ declaredType ~/ distinctFreeIdents(Nil, ",", ";"))
+      .map { case (typ, instanceNames) => instanceNames.map(name => Instance(id(name), typ)) }
   }.map(instances => instances.map(InstanceDeclaration(_)))
 
-  protected def arg(m: Model): Parser[(String, Type)] =
-    (declaredType(m) ~ ident)
+  protected val arg: Parser[(String, Type)] =
+    (declaredType ~ ident)
       .map { case (typ, argName) => (argName, typ) }
 
   /** A list of at least one argument formatted as "Type1 arg, Type2 arg2" */
   protected def distinctArgSeq(
-      m: Model,
       sep: String,
       previous: Seq[(String, Type)] = Seq()): Parser[Seq[(String, Type)]] =
-    Pass ~ arg(m)
+    Pass ~ arg
       .filter(f(a => !previous.exists(_._1 == a._1), "not-used-in-current-arg-sequence"))
-      .flatMap(a =>
-        (Pass ~ sep ~/ distinctArgSeq(m, sep, previous :+ a)) | PassWith(previous :+ a))
+      .flatMap(a => (Pass ~ sep ~/ distinctArgSeq(sep, previous :+ a)) | PassWith(previous :+ a))
 
   /** Parses a sequence of args necessarily enclosed in parenthesis if non empty
     * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
     */
-  protected def args(m: Model): Parser[Seq[(String, Type)]] =
+  protected val args: Parser[Seq[(String, Type)]] =
     ("(" ~/
-      ((&(word) ~/ distinctArgSeq(m, ",")) | PassWith(Seq()).opaque("no-args")) ~
+      ((&(word) ~/ distinctArgSeq(",")) | PassWith(Seq()).opaque("no-args")) ~
       ")") | // parenthesis with and without args
       PassWith(Seq()).opaque("no-args") // no args no, parenthesis
 
-  def fluentDeclaration(m: Model): Parser[FluentDeclaration] =
-    (fluentKW ~/ declaredType(m) ~ freeIdent(m) ~ args(m) ~ ";")
+  val fluentDeclaration: Parser[FluentDeclaration] =
+    (fluentKW ~/ declaredType ~ freeIdent ~ args ~ ";")
       .map {
         case (typ, svName, args) =>
-          FluentTemplate(m.id(svName), typ, args.map {
-            case (name, argType) => Arg(Id(m.scope + svName, name), argType)
+          FluentTemplate(id(svName), typ, args.map {
+            case (name, argType) => Arg(Id(scope + svName, name), argType)
           })
       }
       .map(FluentDeclaration(_))
 
-  def timepointDeclaration(c: Ctx): Parser[TimepointDeclaration] =
+  val timepointDeclaration: Parser[TimepointDeclaration] =
     timepointKW ~/
-      freeIdent(c).map(name => TimepointDeclaration(TPRef(c.id(name)))) ~
+      freeIdent.map(name => TimepointDeclaration(TPRef(id(name)))) ~
       ";"
 
-  protected def definedTP(c: Ctx): Parser[TPRef] =
+  protected val definedTP: Parser[TPRef] =
     ident
-      .filter(f(c.findTimepoint(_).isDefined, "declared-timepoint"))
-      .map(c.findTimepoint(_).get)
+      .filter(f(findTimepoint(_).isDefined, "declared-timepoint"))
+      .map(findTimepoint(_).get)
 
-  def timepoint(c: Ctx): Parser[TPRef] = {
-    (int ~ "+").flatMap(d => timepoint(c).map(tp => tp + d)) |
-      (definedTP(c) ~ (("+" | "-").! ~ int).?).map {
+  val timepoint: Parser[TPRef] = {
+    (int ~ "+").flatMap(d => timepoint.map(tp => tp + d)) |
+      (definedTP ~ (("+" | "-").! ~ int).?).map {
         case (tp, Some(("+", delay))) => tp + delay
         case (tp, Some(("-", delay))) => tp - delay
         case (tp, None)               => tp
@@ -133,29 +139,29 @@ object Parser {
       } |
       int.flatMap(
         i => // integer as a tp defined relatively to the global start, if one exists
-          c.root.findTimepoint("start") match {
+          root.findTimepoint("start") match {
             case Some(st) => PassWith(st + i)
             case None     => Fail.opaque("fail:no start timepoint in top level scope")
         })
   }.opaque("timepoint")
 
-  def delay(c: Ctx): Parser[Delay] =
+  val delay: Parser[Delay] =
     (durationKW ~/ Pass)
       .flatMap(_ =>
-        c.findTimepoint("start").flatMap(st => c.findTimepoint("end").map(ed => (st, ed))) match {
+        findTimepoint("start").flatMap(st => findTimepoint("end").map(ed => (st, ed))) match {
           case Some((st, ed)) => PassWith(Delay(st, ed + 1))
           case None           => sys.error("No start/end timepoint"); Fail
       })
       .opaque("duration") |
-      (timepoint(c) ~ "-" ~ definedTP(c) ~ (("+" | "-").! ~ int).?).map {
+      (timepoint ~ "-" ~ definedTP ~ (("+" | "-").! ~ int).?).map {
         case (t1, t2, None)           => t1 - t2
         case (t1, t2, Some(("+", i))) => (t1 - t2) + i
         case (t1, t2, Some(("-", i))) => (t1 - t2) - i
         case _                        => sys.error("Buggy parser implementation")
       }
 
-  def temporalConstraint(c: Ctx): Parser[Seq[TBefore]] = {
-    (timepoint(c) ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~/ timepoint(c) ~ ";")
+  val temporalConstraint: Parser[Seq[TBefore]] = {
+    (timepoint ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~/ timepoint ~ ";")
       .map {
         case (t1, "<", t2)                                     => Seq(t1 < t2)
         case (t1, "<=", t2)                                    => Seq(t1 <= t2)
@@ -164,7 +170,7 @@ object Parser {
         case (t1, eq, t2) if Set("=", "==", ":=").contains(eq) => t1 === t2
         case _                                                 => sys.error("Buggy parser implementation")
       } |
-      (delay(c) ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~/ int ~ ";")
+      (delay ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~/ int ~ ";")
         .map {
           case (d, "<", t)                                     => Seq(d < t)
           case (d, "<=", t)                                    => Seq(d <= t)
@@ -175,81 +181,102 @@ object Parser {
         }
   }
 
-  def variable(c: Ctx): Parser[Var] =
+  val variable: Parser[Var] =
     ident
-      .filter(f(c.findVariable(_).isDefined, "declared-variable"))
-      .map(c.findVariable(_).get)
+      .filter(f(findVariable(_).isDefined, "declared-variable"))
+      .map(findVariable(_).get)
 
-  def fluent(c: Ctx): Parser[FluentTemplate] =
+  val fluent: Parser[FluentTemplate] =
     ident
-      .filter(f(c.findFluent(_).isDefined, "declared-fluent"))
-      .map(c.findFluent(_).get)
+      .filter(f(findFluent(_).isDefined, "declared-fluent"))
+      .map(findFluent(_).get)
 
-  def timedSymExpr(c: Ctx): Parser[TimedSymExpr] = {
-    def varList(c: Ctx,
-                expectedTypes: Seq[Type],
+  val timedSymExpr: Parser[TimedSymExpr] = {
+    def varList(expectedTypes: Seq[Type],
                 sep: String,
                 previous: Seq[Var] = Seq()): Parser[Seq[Var]] = {
       if (expectedTypes.isEmpty) {
         PassWith(previous)
       } else {
-        variable(c)
+        variable
           .filter(f(_.typ.isSubtypeOf(expectedTypes.head), "has-expected-type"))
-          .flatMap(v =>
-            if(expectedTypes.tail.isEmpty)
-              PassWith(previous :+ v)
-            else
-              Pass ~ sep ~/ varList(c, expectedTypes.tail, sep, previous :+ v)
-          )
+          .flatMap(
+            v =>
+              if (expectedTypes.tail.isEmpty)
+                PassWith(previous :+ v)
+              else
+                Pass ~ sep ~/ varList(expectedTypes.tail, sep, previous :+ v))
       }
     }
-    (fluent(c) ~/ Pass).flatMap(f =>
+    (fluent ~/ Pass).flatMap(f =>
       f.params.map(param => param.typ) match {
         case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq()))
         case paramTypes =>
-          "(" ~/ varList(c, paramTypes, ",").map(args => Fluent(f, args)) ~ ")" ~/ Pass
+          "(" ~/ varList(paramTypes, ",").map(args => Fluent(f, args)) ~ ")" ~/ Pass
     })
   }
 
-  def staticSymExpr(c: Ctx): Parser[StaticSymExpr] =
-    variable(c)
+  val staticSymExpr: Parser[StaticSymExpr] =
+    variable
 
-  def symExpr(c: Ctx): Parser[SymExpr] =
-    timedSymExpr(c)
+  val symExpr: Parser[SymExpr] =
+    timedSymExpr
 
-  def interval(c: Ctx): Parser[Interval] =
-    ("[" ~/ timepoint(c) ~ "," ~/ timepoint(c) ~ "]").map {
+  val interval: Parser[Interval] =
+    ("[" ~/ timepoint ~ "," ~/ timepoint ~ "]").map {
       case (tp1, tp2) => Interval(tp1, tp2)
     }
 
-  def temporallyQualifiedAssertion(c: Ctx): Parser[TemporallyQualifiedAssertion] = {
-    def assertionId(c: Ctx): Parser[String] =
-      (freeIdent(c) ~ ":" ~/ Pass) | PassWith(defaultId())
-    (interval(c) ~/ assertionId(c) ~ timedSymExpr(c) ~ "==" ~/ staticSymExpr(c) ~ ";")
-      .map { case (it, id, left, right) => TemporallyQualifiedAssertion(it, TimedEqualAssertion(left, right, Some(c), id))}
+  val temporallyQualifiedAssertion: Parser[TemporallyQualifiedAssertion] = {
+    val assertionId: Parser[String] =
+      (freeIdent ~ ":" ~/ Pass) | PassWith(defaultId())
+    (interval ~/ assertionId ~ timedSymExpr ~ "==" ~/ staticSymExpr ~ ";")
+      .map {
+        case (it, id, left, right) =>
+          TemporallyQualifiedAssertion(it,
+                                       TimedEqualAssertion(left, right, Some(currentContext), id))
+      }
   }
 
-  def elem(m: Model): Parser[Seq[ModuleElem]] =
-    typeDeclaration(m).map(Seq(_)) |
-      instancesDeclaration(m) |
-      fluentDeclaration(m).map(Seq(_)) |
-      timepointDeclaration(m).map(Seq(_)) |
-      temporalConstraint(m) |
-      temporallyQualifiedAssertion(m).map(Seq(_))
+  val elem: Parser[Seq[ModuleElem]] =
+    typeDeclaration.map(Seq(_)) |
+      instancesDeclaration |
+      fluentDeclaration.map(Seq(_)) |
+      timepointDeclaration.map(Seq(_)) |
+      temporalConstraint |
+      temporallyQualifiedAssertion.map(Seq(_))
 
-  def anmlParser(mod: Model): Parser[Model] =
-    End ~ PassWith(mod) |
-      (Pass ~ elem(mod) ~ Pass).flatMap(elem =>
-        mod ++ elem match {
-          case Some(extended) => anmlParser(extended)
-          case None           => Fail
+}
+
+class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel) {
+  import fastparse.noApi._
+  import White._
+
+  private[this] def currentModel: Model = currentContext match {
+    case m: Model => m
+    case x        => sys.error("Current context is not a model")
+  }
+
+  private[this] def anmlParser: Parser[Model] =
+    End ~ PassWith(currentModel) |
+      (Pass ~ elem ~ Pass).flatMap(elem =>
+        currentModel ++ elem match {
+          case Some(extended) =>
+            updateContext(extended) // change state
+            anmlParser
+          case None => Fail.opaque("fail: parsed elem does not fit into the previous model")
       })
 
   def parse(input: String) = {
-    anmlParser(baseAnmlModel).parse(input)
+    updateContext(initialModel)
+    anmlParser.parse(input)
   }
+}
 
-  val baseAnmlModel = anmlParser(Model()).parse("""
+object Parser {
+
+  /** ANML model with default definitions already added */
+  val baseAnmlModel: Model = new AnmlModuleParser(Model()).parse("""
       |type boolean;
       |instance boolean true, false;
       |timepoint start;
@@ -258,5 +285,9 @@ object Parser {
     case Success(m, _) => m
     case x             => sys.error(s"Could not build the base anml model: $x")
   }
+  val parser = new AnmlModuleParser(baseAnmlModel)
 
+  def parse(input: String) = {
+    parser.parse(input)
+  }
 }

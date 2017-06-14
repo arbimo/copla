@@ -70,27 +70,14 @@ class AnmlParsingTest extends FunSuite {
     }
   }
 
-  test("performance") {
-    for(i <- 0 to 100) {
-      for(input <- valid) {
-        Parser.parse(input)
-      }
-    }
-  }
-
-  test("timed-expression") {
-    val ctx  = "type A; type B; fluent A f(B b, B x); instance B b1, b2;"
-    val mod  = Parser.parse(ctx).get.value
-    val anml = "f(b1, b2)"
-    Parser.timedSymExpr(mod).parse(anml) match {
-      case Success(expr, _) =>
-        println("PARSED:\n" + anml + "\n")
-        println("AS:\n" + expr + "\n\n")
-
-      case x =>
-        fail(s"Could not parse anml string: $x\n\n$anml\n")
-    }
-  }
+//  for(i <- 0 to 10)
+//    test("performance "+i) {
+//      for(i <- 0 to 1000) {
+//        for(input <- valid) {
+//          Parser.parse(input)
+//        }
+//      }
+//    }
 
   val tmp =
     "type A; type B; fluent A f(B b); instance A a1; instance B b1; [start,end] f(b1) == a1;"
