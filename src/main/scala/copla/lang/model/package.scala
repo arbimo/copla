@@ -7,22 +7,29 @@ import scala.collection.mutable
 
 package object model {
 
-  val reservedPrefix = "__"
+  val reservedPrefix       = "__"
   private[this] var nextID = 0
-  def defaultId(): String = reservedPrefix + { nextID+=1; nextID-1 }
+  def defaultId(): String  = reservedPrefix + { nextID += 1; nextID - 1 }
 
   trait Elem
   trait ModuleElem extends Elem
   trait Statement  extends ModuleElem
+
+  /** An elem wrapping otehr elems pertaining to the same scope. */
+  trait Wrapper extends Elem {
+    def wrapped: Seq[Elem]
+  }
+
   trait SymExpr extends Elem {
     def typ: Type
   }
   trait TimedSymExpr  extends SymExpr
   trait StaticSymExpr extends SymExpr
 
-  abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx {
-    val elems = Seq(TimepointDeclaration(TPRef(this.id("start"))),
-                    TimepointDeclaration(TPRef(this.id("end"))))
+  abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx with ModuleElem {
+    override val elems =
+      Seq(TimepointDeclaration(TPRef(this.id("start"))),
+          TimepointDeclaration(TPRef(this.id("end"))))
   }
   case class TimedEqualAssertion(left: TimedSymExpr,
                                  right: StaticSymExpr,
@@ -33,7 +40,11 @@ package object model {
       if (name.startsWith(reservedPrefix)) s"$left == $right"
       else s"$name: $left == $right"
   }
-  case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion) extends ModuleElem {
+  case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion)
+      extends ModuleElem
+      with Wrapper {
+
+    override def wrapped  = Seq(assertion)
     override def toString = s"$interval $assertion"
   }
 
@@ -184,7 +195,7 @@ package object model {
   }
 
   trait Ctx {
-    def elems: Seq[Elem]
+    val elems: Seq[Elem]
     def parent: Option[Ctx]
     def name: String
     def root: Ctx = parent match {
@@ -192,39 +203,68 @@ package object model {
       case None    => this
     }
 
-    val scope: Scope = parent.map(_.scope + name).getOrElse(Scope(Seq(name)))
+    final val scope: Scope = parent.map(_.scope + name).getOrElse(Scope(Seq()))
+    assert(scope != null)
+
+    def allElems: Seq[Elem] = elems.flatMap {
+      case wrapper: Wrapper => wrapper +: wrapper.wrapped
+      case any: Any         => Seq(any)
+    }
+
+    private[this] lazy val declarations: Map[String, Declaration[_]] =
+      allElems.collect {
+        case x: Declaration[_] => {
+          assert(x.id.scope == this.scope)
+          (x.id.name, x)
+        }
+      }.toMap
+
+    private[this] lazy val subContexts: Map[String, Ctx] =
+      allElems.collect {
+        case x: Ctx => (x.name, x)
+      }.toMap
 
     def id(name: String): Id = Id(scope, name)
 
+    def findDeclaration(name: String): Option[Declaration[_]] = {
+      (name.split("\\.").toList match {
+        case single :: Nil =>
+          declarations.get(single)
+        case head :: tail =>
+          subContexts.get(head).flatMap(sc => sc.findDeclaration(tail.mkString(".")))
+        case Nil =>
+          sys.error("Invalid name: " + name)
+      }).orElse(parent.flatMap(_.findDeclaration(name)))
+    }
+
     def findVariable(name: String): Option[Var] =
-      elems
-        .collect { case x: VarDeclaration[_] if x.variable.id.name == name => x.variable }
-        .headOption
-        .orElse(parent.flatMap(_.findVariable(name)))
+      findDeclaration(name: String).flatMap {
+        case decl: VarDeclaration[_] => Some(decl.variable)
+        case _                       => None
+      }
 
     def findTimepoint(name: String): Option[TPRef] =
-      elems
-        .collect { case TimepointDeclaration(tp) if tp.id.name == name => tp }
-        .headOption
-        .orElse(parent.flatMap(_.findTimepoint(name)))
+      findDeclaration(name).flatMap {
+        case TimepointDeclaration(tp) => Some(tp)
+        case _                        => None
+      }
 
     def findType(name: String): Option[Type] =
-      elems
-        .collect { case TypeDeclaration(t) if t.id.name == name => t }
-        .headOption
-        .orElse(parent.flatMap(_.findType(name)))
+      findDeclaration(name).flatMap {
+        case TypeDeclaration(typ) => Some(typ)
+        case _                    => None
+      }
 
     def findFluent(name: String): Option[FluentTemplate] =
-      elems
-        .collect { case FluentDeclaration(t) if t.id.name == name => t }
-        .headOption
-        .orElse(parent.flatMap(_.findFluent(name)))
+      findDeclaration(name).flatMap {
+        case FluentDeclaration(t) => Some(t)
+        case _                    => None
+      }
   }
 
   case class Model(elems: Seq[ModuleElem] = mutable.Buffer()) extends Ctx {
     override def parent = None
     override def name   = "_module_"
-    override val scope  = Scope(Seq()) // root scope
 
     def +(elem: ModuleElem): Option[Model] = {
       Some(Model(elem +: elems))

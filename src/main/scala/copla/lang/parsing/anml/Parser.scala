@@ -45,7 +45,8 @@ abstract class AnmlParser(val initialContext: Ctx) {
   val reservedTypeNames    = Set()
   val nonIdent             = keywords ++ reservedTypeNames
 
-  val ident                    = word.opaque("ident").filter(f(!nonIdent.contains(_), "not-reserved"))
+  val simpleIdent              = word.opaque("ident").filter(f(!nonIdent.contains(_), "not-reserved"))
+  val ident: Parser[String]    = simpleIdent.rep(min = 1, sep = ".").!
   val typeName: Parser[String] = word.filter(!keywords.contains(_)).opaque("type-name")
   val variableName             = ident.opaque("variable-name")
 
@@ -56,8 +57,10 @@ abstract class AnmlParser(val initialContext: Ctx) {
   }
 
   val freeIdent =
-    ident.filter(
-      f(name => elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name), "unused"))
+    simpleIdent
+      .filter(
+        f(name => elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name),
+          "unused"))
 
   val declaredType: Parser[Type] =
     typeName
@@ -228,6 +231,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
     }
 
   val timedAssertion: Parser[TimedAssertion] = {
+
     /** Read an identifier or construct a default one otherwise */
     val assertionId: Parser[String] =
       (freeIdent ~ ":" ~/ Pass) | PassWith(defaultId())
