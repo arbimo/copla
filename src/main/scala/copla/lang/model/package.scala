@@ -7,13 +7,18 @@ import scala.collection.mutable
 
 package object model {
 
-  val reservedPrefix       = "__"
+  val reservedPrefix = "__"
   private[this] var nextID = 0
-  def defaultId(): String  = reservedPrefix + { nextID += 1; nextID - 1 }
+
+  def defaultId(): String = reservedPrefix + {
+    nextID += 1; nextID - 1
+  }
 
   trait Elem
+
   trait ModuleElem extends Elem
-  trait Statement  extends ModuleElem
+
+  trait Statement extends ModuleElem
 
   /** An elem wrapping otehr elems pertaining to the same scope. */
   trait Wrapper extends Elem {
@@ -23,28 +28,33 @@ package object model {
   trait SymExpr extends Elem {
     def typ: Type
   }
-  trait TimedSymExpr  extends SymExpr
+
+  trait TimedSymExpr extends SymExpr
+
   trait StaticSymExpr extends SymExpr
 
   abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx with ModuleElem {
     override val elems =
       Seq(TimepointDeclaration(TPRef(this.id("start"))),
-          TimepointDeclaration(TPRef(this.id("end"))))
+        TimepointDeclaration(TPRef(this.id("end"))))
   }
+
   case class TimedEqualAssertion(left: TimedSymExpr,
                                  right: StaticSymExpr,
                                  parent: Option[Ctx],
                                  name: String)
-      extends TimedAssertion(parent, name) {
+    extends TimedAssertion(parent, name) {
     override def toString =
-      if (name.startsWith(reservedPrefix)) s"$left == $right"
+      if(name.startsWith(reservedPrefix)) s"$left == $right"
       else s"$name: $left == $right"
   }
+
   case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion)
-      extends ModuleElem
+    extends ModuleElem
       with Wrapper {
 
-    override def wrapped  = Seq(assertion)
+    override def wrapped = Seq(assertion)
+
     override def toString = s"$interval $assertion"
   }
 
@@ -52,21 +62,32 @@ package object model {
     def id: Id
   }
 
-  case class Type(id: Id, parent: Option[Type]) {
+  class FutureType(name: String) {
+    def map(f: PartialFunction[FutureType, FutureType]) =
+      f.applyOrElse(this, (x: FutureType) => x)
+  }
+
+  case class Type(id: Id, parent: Option[Type]) extends FutureType(id.name) with Final {
     def isSubtypeOf(typ: Type): Boolean =
       this == typ || parent.exists(t => t == typ || t.isSubtypeOf(typ))
 
     override def toString = id.toString
   }
+
   case class TypeDeclaration(typ: Type) extends Declaration[Type] with ModuleElem {
     override def id = typ.id
+
     override def toString = s"type $id" + {
-      if (typ.parent.isDefined) " < " + typ.parent.get else ""
+      if(typ.parent.isDefined) " < " + typ.parent.get else ""
     }
   }
 
-  case class FluentTemplate(id: Id, typ: Type, params: Seq[Arg]) {
+  trait Final
 
+  class FutureArg(id: Id, typ: FutureType)
+  class FutureFluentTemplate(id: Id, typ: FutureType, params: Seq[FutureArg]) extends Elem
+
+  case class FluentTemplate(id: Id, typ: Type, params: Seq[Arg]) extends FutureFluentTemplate(id, typ, params) {
     def apply(variables: Var*): Fluent = {
       require(params.size == variables.size, s"Wrong number of arguments for state variable, $id")
       Fluent(this, variables)
@@ -128,7 +149,7 @@ package object model {
   }
 
   /** Denote the argument of the template of state variables and actions. */
-  case class Arg(id: Id, typ: Type) extends Var {
+  case class Arg(id: Id, typ: Type) extends FutureArg(id, typ) with Var{
     override def toString = s"${typ.id} $id"
   }
   case class ArgDeclaration(arg: Arg) extends VarDeclaration[Arg] {
