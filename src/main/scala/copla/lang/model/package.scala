@@ -56,6 +56,8 @@ package object model {
     def isSubtypeOf(typ: Type): Boolean =
       this == typ || parent.exists(t => t == typ || t.isSubtypeOf(typ))
 
+    def asScope: Scope = id.scope + id.name
+
     override def toString = id.toString
   }
   case class TypeDeclaration(typ: Type) extends Declaration[Type] with ModuleElem {

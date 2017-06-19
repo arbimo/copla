@@ -36,14 +36,15 @@ abstract class AnmlParser(val initialContext: Ctx) {
   }
   val int: Parser[Int] = CharsWhileIn('0' to '9').!.map(_.toInt).opaque("int")
 
-  val typeKW: Parser[Unit] = word.filter(_ == "type").map(x => {}).opaque("type")
-  val instanceKW           = word.filter(_ == "instance").map(_ => {}).opaque("instance")
-  val fluentKW             = word.filter(_ == "fluent").map(_ => {}).opaque("instance")
-  val timepointKW          = word.filter(_ == "timepoint").map(_ => {}).opaque("instance")
-  val durationKW           = word.filter(_ == "duration").map(_ => {}).opaque("duration")
-  val keywords             = Set("type", "instance", "action", "duration", "fluent", "predicate", "timepoint")
-  val reservedTypeNames    = Set()
-  val nonIdent             = keywords ++ reservedTypeNames
+  val typeKW            = word.filter(_ == "type").map(x => {}).opaque("type")
+  val withKW            = word.filter(_ == "with").map(x => {}).opaque("with")
+  val instanceKW        = word.filter(_ == "instance").map(_ => {}).opaque("instance")
+  val fluentKW          = word.filter(_ == "fluent").map(_ => {}).opaque("instance")
+  val timepointKW       = word.filter(_ == "timepoint").map(_ => {}).opaque("instance")
+  val durationKW        = word.filter(_ == "duration").map(_ => {}).opaque("duration")
+  val keywords          = Set("type", "instance", "action", "duration", "fluent", "predicate", "timepoint")
+  val reservedTypeNames = Set()
+  val nonIdent          = keywords ++ reservedTypeNames
 
   val simpleIdent              = word.opaque("ident").filter(f(!nonIdent.contains(_), "not-reserved"))
   val ident: Parser[String]    = simpleIdent.rep(min = 1, sep = ".").!
@@ -51,7 +52,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
   val variableName             = ident.opaque("variable-name")
 
   /** Simple wrapper to attach a toString method to a function */
-  private[this] def f[T, V](f: T => V, str: String) = new Function[T, V] {
+  protected def f[T, V](f: T => V, str: String) = new Function[T, V] {
     def apply(v: T)       = f(v)
     override def toString = str
   }
@@ -66,61 +67,6 @@ abstract class AnmlParser(val initialContext: Ctx) {
     typeName
       .filter(f(findType(_).isDefined, "declared"))
       .map(findType(_).get)
-
-  val typeDeclaration: Parser[TypeDeclaration] =
-    (typeKW ~/
-      freeIdent
-      ~ ("<" ~/ declaredType.!).asInstanceOf[Parser[Type]].?
-      ~ ";")
-      .map { case (name, parentOpt) => Type(id(name), parentOpt) }
-      .map(TypeDeclaration(_))
-
-  /** Parser for instance declaration.
-    * "instance Type id1, id2, id3;" */
-  val instancesDeclaration: Parser[Seq[InstanceDeclaration]] = {
-
-    /** Parses a sequences of yet unused *distinct* identifiers. */
-    def distinctFreeIdents(previous: Seq[String], sep: String, term: String): Parser[Seq[String]] =
-      Pass ~ freeIdent
-        .filter(f(!previous.contains(_), "not-in-same-instance-list"))
-        .flatMap(name =>
-          Pass ~ sep ~/ distinctFreeIdents(previous :+ name, sep, term)
-            | Pass ~ term ~ PassWith(previous :+ name))
-
-    (instanceKW ~/ declaredType ~/ distinctFreeIdents(Nil, ",", ";"))
-      .map { case (typ, instanceNames) => instanceNames.map(name => Instance(id(name), typ)) }
-  }.map(instances => instances.map(InstanceDeclaration(_)))
-
-  protected val arg: Parser[(String, Type)] =
-    (declaredType ~ ident)
-      .map { case (typ, argName) => (argName, typ) }
-
-  /** A list of at least one argument formatted as "Type1 arg, Type2 arg2" */
-  protected def distinctArgSeq(
-      sep: String,
-      previous: Seq[(String, Type)] = Seq()): Parser[Seq[(String, Type)]] =
-    Pass ~ arg
-      .filter(f(a => !previous.exists(_._1 == a._1), "not-used-in-current-arg-sequence"))
-      .flatMap(a => (Pass ~ sep ~/ distinctArgSeq(sep, previous :+ a)) | PassWith(previous :+ a))
-
-  /** Parses a sequence of args necessarily enclosed in parenthesis if non empty
-    * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
-    */
-  protected val args: Parser[Seq[(String, Type)]] =
-    ("(" ~/
-      ((&(word) ~/ distinctArgSeq(",")) | PassWith(Seq()).opaque("no-args")) ~
-      ")") | // parenthesis with and without args
-      PassWith(Seq()).opaque("no-args") // no args no, parenthesis
-
-  val fluentDeclaration: Parser[FluentDeclaration] =
-    (fluentKW ~/ declaredType ~ freeIdent ~ args ~ ";")
-      .map {
-        case (typ, svName, args) =>
-          FluentTemplate(id(svName), typ, args.map {
-            case (name, argType) => Arg(Id(scope + svName, name), argType)
-          })
-      }
-      .map(FluentDeclaration(_))
 
   val timepointDeclaration: Parser[TimepointDeclaration] =
     timepointKW ~/
@@ -249,6 +195,66 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .map { case (it, assertion) => TemporallyQualifiedAssertion(it, assertion) }
   }
 
+}
+
+class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel) {
+  import fastparse.noApi._
+  import White._
+
+  val typeDeclaration: Parser[TypeDeclaration] =
+    (typeKW ~/
+      freeIdent
+      ~ ("<" ~/ declaredType.!).asInstanceOf[Parser[Type]].?
+      ~ ";")
+      .map { case (name, parentOpt) => TypeDeclaration(Type(id(name), parentOpt)) }
+
+  /** Parser for instance declaration.
+    * "instance Type id1, id2, id3;" */
+  val instancesDeclaration: Parser[Seq[InstanceDeclaration]] = {
+
+    /** Parses a sequences of yet unused *distinct* identifiers. */
+    def distinctFreeIdents(previous: Seq[String], sep: String, term: String): Parser[Seq[String]] =
+      Pass ~ freeIdent
+        .filter(f(!previous.contains(_), "not-in-same-instance-list"))
+        .flatMap(name =>
+          Pass ~ sep ~/ distinctFreeIdents(previous :+ name, sep, term)
+            | Pass ~ term ~ PassWith(previous :+ name))
+
+    (instanceKW ~/ declaredType ~/ distinctFreeIdents(Nil, ",", ";"))
+      .map { case (typ, instanceNames) => instanceNames.map(name => Instance(id(name), typ)) }
+  }.map(instances => instances.map(InstanceDeclaration(_)))
+
+  val fluentDeclaration: Parser[FluentDeclaration] = {
+    val arg: Parser[(String, Type)] =
+      (declaredType ~ ident)
+        .map { case (typ, argName) => (argName, typ) }
+
+    /** A list of at least one argument formatted as "Type1 arg, Type2 arg2" */
+    def distinctArgSeq(sep: String,
+                       previous: Seq[(String, Type)] = Seq()): Parser[Seq[(String, Type)]] =
+      Pass ~ arg
+        .filter(f(a => !previous.exists(_._1 == a._1), "not-used-in-current-arg-sequence"))
+        .flatMap(a => (Pass ~ sep ~/ distinctArgSeq(sep, previous :+ a)) | PassWith(previous :+ a))
+
+    /** Parses a sequence of args necessarily enclosed in parenthesis if non empty
+      * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
+      */
+    val args: Parser[Seq[(String, Type)]] =
+      ("(" ~/
+        ((&(word) ~/ distinctArgSeq(",")) | PassWith(Seq()).opaque("no-args")) ~
+        ")") | // parenthesis with and without args
+        PassWith(Seq()).opaque("no-args") // no args no, parenthesis
+
+    (fluentKW ~/ declaredType ~ freeIdent ~ args ~ ";")
+      .map {
+        case (typ, svName, args) =>
+          FluentTemplate(id(svName), typ, args.map {
+            case (name, argType) => Arg(Id(scope + svName, name), argType)
+          })
+      }
+      .map(FluentDeclaration(_))
+  }
+
   val elem: Parser[Seq[ModuleElem]] =
     typeDeclaration.map(Seq(_)) |
       instancesDeclaration |
@@ -256,12 +262,6 @@ abstract class AnmlParser(val initialContext: Ctx) {
       timepointDeclaration.map(Seq(_)) |
       temporalConstraint |
       temporallyQualifiedAssertion.map(Seq(_))
-
-}
-
-class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel) {
-  import fastparse.noApi._
-  import White._
 
   private[this] def currentModel: Model = currentContext match {
     case m: Model => m
