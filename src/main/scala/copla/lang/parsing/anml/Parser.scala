@@ -5,7 +5,7 @@ import fastparse.core.Parsed.{Failure, Success}
 
 abstract class AnmlParser(val initialContext: Ctx) {
   private[this] var updatableContext = initialContext
-  def updateContext(newContext: Ctx) {
+  protected def updateContext(newContext: Ctx) {
     updatableContext = newContext
   }
 
@@ -197,16 +197,22 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
 }
 
+/** Second phase parser that extracts all ANML elements expects types that should
+  *  be already present in the initial model. */
 class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel) {
   import fastparse.noApi._
   import White._
 
-  val typeDeclaration: Parser[TypeDeclaration] =
+  /** Extract the function declared in a type. THis consumes the whole type declaration.
+    * Note that the type should be already present in the module.
+    * Typically consumed:
+    *   "type B < A with { fluent f(C c); };" */
+  val inTypeFunctionDeclaration: Parser[Seq[FluentDeclaration]] =
     (typeKW ~/
-      freeIdent
+      declaredType
       ~ ("<" ~/ declaredType.!).asInstanceOf[Parser[Type]].?
       ~ ";")
-      .map { case (name, parentOpt) => TypeDeclaration(Type(id(name), parentOpt)) }
+      .map { case (t, _) => Seq() }
 
   /** Parser for instance declaration.
     * "instance Type id1, id2, id3;" */
@@ -256,7 +262,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
   }
 
   val elem: Parser[Seq[ModuleElem]] =
-    typeDeclaration.map(Seq(_)) |
+    inTypeFunctionDeclaration |
       instancesDeclaration |
       fluentDeclaration.map(Seq(_)) |
       timepointDeclaration.map(Seq(_)) |
@@ -284,21 +290,62 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
   }
 }
 
-object Parser {
+/** First phase parser used to extract all type declarations from a given ANML string. */
+class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
+  import fastparse.noApi._
+  import White._
 
-  /** ANML model with default definitions already added */
-  val baseAnmlModel: Model = new AnmlModuleParser(Model()).parse("""
-      |type boolean;
-      |instance boolean true, false;
-      |timepoint start;
-      |timepoint end;
-    """.stripMargin) match {
-    case Success(m, _) => m
-    case x             => sys.error(s"Could not build the base anml model: $x")
+  val nonTypeToken = (word | int | CharIn("[]();=:<>-+.,")).!.filter(_ != "type")
+  val typeDeclaration = (typeKW ~/ freeIdent ~ ("<" ~ declaredType).? ~ (";" | withKW)).map {
+    case (name, parentOpt) => TypeDeclaration(Type(id(name), parentOpt))
   }
-  val parser = new AnmlModuleParser(baseAnmlModel)
+
+  private[this] def currentModel: Model = currentContext match {
+    case m: Model => m
+    case x        => sys.error("Current context is not a model")
+  }
+
+  private[this] def parser: Parser[Model] =
+    End ~ PassWith(currentModel) |
+      (Pass ~ nonTypeToken ~/ Pass).flatMap(_ => parser) |
+      (Pass ~ typeDeclaration ~ Pass).flatMap(typeDecl =>
+        currentModel + typeDecl match {
+          case Some(extendedModel) =>
+            updateContext(extendedModel)
+            parser
+          case None => Fail
+      })
 
   def parse(input: String) = {
+    updateContext(initialModel)
     parser.parse(input)
+  }
+}
+
+object Parser {
+
+  val anmlHeader =
+    """|type boolean;
+       |instance boolean true, false;
+       |timepoint start;
+       |timepoint end;
+    """.stripMargin
+
+  /** ANML model with default definitions already added */
+  val baseAnmlModel: Model = new AnmlTypeParser(Model()).parse(anmlHeader) match {
+    case Success(m, _) =>
+      new AnmlModuleParser(m).parse(anmlHeader) match {
+        case Success(m, _) => m
+        case x             => sys.error(s"could not parse the ANML header: $x")
+      }
+    case x => sys.error(s"Could not parse types the base anml model: $x")
+  }
+
+  def parse(input: String) = {
+    new AnmlTypeParser(baseAnmlModel).parse(input) match {
+      case Success(m, _) =>
+        new AnmlModuleParser(m).parse(input)
+      case x => x
+    }
   }
 }
