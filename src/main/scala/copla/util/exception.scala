@@ -1,6 +1,4 @@
-package copla.lang
-
-import java.lang.management.ManagementFactory
+package copla.util
 
 import scala.annotation.elidable
 import scala.annotation.elidable._
@@ -21,11 +19,6 @@ import scala.annotation.elidable._
 object exception {
 
   var DEBUG_LEVEL = 3
-
-  class LangError(msg: String) extends Exception
-  @inline def error(msg: String) = throw new LangError(msg)
-
-
 
   @elidable(ASSERTION) @inline
   final def assert1(assertion: => Boolean, message: => Any = {}) {

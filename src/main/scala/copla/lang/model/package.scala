@@ -1,7 +1,7 @@
 package copla.lang
 
 import copla.lang.parsing.anml.Parser
-import exception._
+import copla.util.exception._
 
 import scala.collection.mutable
 
