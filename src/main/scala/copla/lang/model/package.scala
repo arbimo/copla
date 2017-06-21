@@ -291,6 +291,13 @@ package object model {
         case t: FluentTemplate => Some(t)
         case _                 => None
       }
+
+    def findConstant(name: String): Option[ConstantTemplate] =
+      findFunction(name).flatMap {
+        case t: ConstantTemplate => Some(t)
+        case _                   => None
+      }
+
   }
 
   case class Model(elems: Seq[ModuleElem] = mutable.Buffer()) extends Ctx {

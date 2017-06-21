@@ -15,11 +15,12 @@ abstract class AnmlParser(val initialContext: Ctx) {
   def parent         = currentContext.parent
   def root           = currentContext.root
 
-  def id(name: String): Id                             = Id(scope, name)
-  def findVariable(name: String): Option[Var]          = currentContext.findVariable(name)
-  def findTimepoint(name: String): Option[TPRef]       = currentContext.findTimepoint(name)
-  def findType(name: String): Option[Type]             = currentContext.findType(name)
-  def findFluent(name: String): Option[FluentTemplate] = currentContext.findFluent(name)
+  def id(name: String): Id                                 = Id(scope, name)
+  def findVariable(name: String): Option[Var]              = currentContext.findVariable(name)
+  def findTimepoint(name: String): Option[TPRef]           = currentContext.findTimepoint(name)
+  def findType(name: String): Option[Type]                 = currentContext.findType(name)
+  def findFluent(name: String): Option[FluentTemplate]     = currentContext.findFluent(name)
+  def findFunction(name: String): Option[FunctionTemplate] = currentContext.findFunction(name)
 
   val White = fastparse.WhitespaceApi.Wrapper {
     import fastparse.all._
@@ -141,15 +142,20 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .filter(f(findFluent(_).isDefined, "declared-fluent"))
       .map(findFluent(_).get)
 
+  val constantFunc: Parser[ConstantTemplate] =
+    ident
+      .filter(f(currentContext.findConstant(_).isDefined, "declared-fluent"))
+      .map(currentContext.findConstant(_).get)
+
   /** Parses a fluent in the object oriented notation.
     * "x.f" where x is a variable of type T and f is a fluent declared in type T or in a supertype of T.
     * Returns the fluent T.f and x which is to be the first argument of T.f */
-  val partiallyAppliedFluent: Parser[(FluentTemplate, Var)] = {
+  val partiallyAppliedFunction: Parser[(FunctionTemplate, Var)] = {
 
     /** Retrieves a fluent template declared the the given type or one of its super types.*/
-    def findInTypeFluent(typ: Type, fluentName: String): Option[FluentTemplate] =
-      findFluent(typ.id.name + "." + fluentName).orElse(typ.parent.flatMap(p =>
-        findInTypeFluent(p, fluentName)))
+    def findInTypeFunction(typ: Type, fluentName: String): Option[FunctionTemplate] =
+      findFunction(typ.id.name + "." + fluentName).orElse(typ.parent.flatMap(p =>
+        findInTypeFunction(p, fluentName)))
 
     ident
       .map(str => str.split("\\.").toList)
@@ -160,10 +166,10 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .filter(f(_._1.isDefined, "declared-variable"))
       .map(tup => (tup._1.get, tup._2))
       // keep if we can find the fluent in the type of the variable
-      .filter(f({ case (v, fluentName) => findInTypeFluent(v.typ, fluentName).isDefined },
+      .filter(f({ case (v, fluentName) => findInTypeFunction(v.typ, fluentName).isDefined },
                 s"fluent-available-for-this-variable-type"))
       // return the fluent and the variable
-      .map { case (v, fluentName) => (findInTypeFluent(v.typ, fluentName).get, v) }
+      .map { case (v, fluentName) => (findInTypeFunction(v.typ, fluentName).get, v) }
   }
 
   private[this] def varList(expectedTypes: Seq[Type],
@@ -184,6 +190,10 @@ abstract class AnmlParser(val initialContext: Ctx) {
   }
 
   val timedSymExpr: Parser[TimedSymExpr] = {
+    val partiallyAppliedFluent = partiallyAppliedFunction
+      .filter(_._1.isInstanceOf[FluentTemplate])
+      .map(tup => (tup._1.asInstanceOf[FluentTemplate], tup._2))
+
     (fluent ~/ Pass).flatMap(f =>
       f.params.map(param => param.typ) match {
         case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq()))
@@ -201,8 +211,27 @@ abstract class AnmlParser(val initialContext: Ctx) {
       }
   }
 
-  val staticSymExpr: Parser[StaticSymExpr] =
-    variable
+  val staticSymExpr: Parser[StaticSymExpr] = {
+    val partiallyAppliedConstant = partiallyAppliedFunction
+      .filter(_._1.isInstanceOf[ConstantTemplate])
+      .map(tup => (tup._1.asInstanceOf[ConstantTemplate], tup._2))
+    variable |
+    (constantFunc ~/ Pass).flatMap(f =>
+      f.params.map(param => param.typ) match {
+        case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Constant(f, Seq()))
+        case paramTypes =>
+          "(" ~/ varList(paramTypes, ",").map(args => Constant(f, args)) ~ ")" ~/ Pass
+    }) |
+      (partiallyAppliedConstant ~/ Pass).flatMap {
+        case (f, firstArg) =>
+          f.params.map(param => param.typ) match {
+            case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Constant(f, Seq(firstArg)))
+            case paramTypes =>
+              "(" ~/ varList(paramTypes.tail, ",")
+                .map(args => Constant(f, firstArg +: args)) ~ ")" ~/ Pass
+          }
+      }
+  }
 
   val symExpr: Parser[SymExpr] =
     timedSymExpr
