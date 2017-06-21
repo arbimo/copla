@@ -39,7 +39,8 @@ abstract class AnmlParser(val initialContext: Ctx) {
   val typeKW            = word.filter(_ == "type").map(x => {}).opaque("type")
   val withKW            = word.filter(_ == "with").map(x => {}).opaque("with")
   val instanceKW        = word.filter(_ == "instance").map(_ => {}).opaque("instance")
-  val fluentKW          = word.filter(_ == "fluent").map(_ => {}).opaque("instance")
+  val fluentKW          = word.filter(_ == "fluent").map(_ => {}).opaque("fluent")
+  val constantKW        = word.filter(_ == "constant").map(_ => {}).opaque("constant")
   val timepointKW       = word.filter(_ == "timepoint").map(_ => {}).opaque("instance")
   val durationKW        = word.filter(_ == "duration").map(_ => {}).opaque("duration")
   val keywords          = Set("type", "instance", "action", "duration", "fluent", "predicate", "timepoint")
@@ -253,7 +254,10 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
       .map { case (typ, instanceNames) => instanceNames.map(name => Instance(id(name), typ)) }
   }.map(instances => instances.map(InstanceDeclaration(_)))
 
-  val fluentDeclaration: Parser[FluentDeclaration] = {
+  /** Parses a sequence of args necessarily enclosed in parenthesis if non empty
+    * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
+    */
+  private[this] val argList: Parser[Seq[(String, Type)]] = {
     val arg: Parser[(String, Type)] =
       (declaredType ~ ident)
         .map { case (typ, argName) => (argName, typ) }
@@ -265,16 +269,14 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
         .filter(f(a => !previous.exists(_._1 == a._1), "not-used-in-current-arg-sequence"))
         .flatMap(a => (Pass ~ sep ~/ distinctArgSeq(sep, previous :+ a)) | PassWith(previous :+ a))
 
-    /** Parses a sequence of args necessarily enclosed in parenthesis if non empty
-      * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
-      */
-    val args: Parser[Seq[(String, Type)]] =
-      ("(" ~/
-        ((&(word) ~/ distinctArgSeq(",")) | PassWith(Seq()).opaque("no-args")) ~
-        ")") | // parenthesis with and without args
-        PassWith(Seq()).opaque("no-args") // no args no, parenthesis
+    ("(" ~/
+      ((&(word) ~/ distinctArgSeq(",")) | PassWith(Seq()).opaque("no-args")) ~
+      ")") | // parenthesis with and without args
+      PassWith(Seq()).opaque("no-args") // no args no, parenthesis
+  }
 
-    (fluentKW ~/ declaredType ~ freeIdent ~ args ~ ";")
+  val fluentDeclaration: Parser[FluentDeclaration] = {
+    (fluentKW ~/ declaredType ~ freeIdent ~ argList ~ ";")
       .map {
         case (typ, svName, args) =>
           FluentTemplate(id(svName), typ, args.map {
@@ -282,6 +284,17 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
           })
       }
       .map(FluentDeclaration(_))
+  }
+
+  val constantDeclaration: Parser[ConstantDeclaration] = {
+    (constantKW ~/ declaredType ~ freeIdent ~ argList ~ ";")
+      .map {
+        case (typ, svName, args) =>
+          ConstantTemplate(id(svName), typ, args.map {
+            case (name, argType) => Arg(Id(scope + svName, name), argType)
+          })
+      }
+      .map(ConstantDeclaration(_))
   }
 
   /** Extract the functions declared in a type. This consumes the whole type declaration.
@@ -311,6 +324,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
     inTypeFunctionDeclaration |
       instancesDeclaration |
       fluentDeclaration.map(Seq(_)) |
+      constantDeclaration.map(Seq(_)) |
       timepointDeclaration.map(Seq(_)) |
       temporalConstraint |
       temporallyQualifiedAssertion.map(Seq(_))

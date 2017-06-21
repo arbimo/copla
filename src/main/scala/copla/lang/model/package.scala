@@ -69,11 +69,6 @@ package object model {
 
   case class FluentTemplate(id: Id, typ: Type, params: Seq[Arg]) {
 
-    def apply(variables: Var*): Fluent = {
-      require(params.size == variables.size, s"Wrong number of arguments for state variable, $id")
-      Fluent(this, variables)
-    }
-
     override def toString = id.toString
   }
   case class FluentDeclaration(fluent: FluentTemplate)
@@ -92,8 +87,29 @@ package object model {
 
     override def typ = template.typ
 
-//    def ===(transition: Transition): InnerTransitionAssertion =
-//      InnerTransitionAssertion(this, transition.vStart, transition.vEnd)
+    override def toString = s"$template(${params.mkString(", ")})"
+  }
+
+  case class ConstantTemplate(id: Id, typ: Type, params: Seq[Arg]) {
+
+    override def toString = id.toString
+  }
+  case class ConstantDeclaration(constant: ConstantTemplate)
+      extends Declaration[ConstantTemplate]
+      with ModuleElem {
+    override def id = constant.id
+    override def toString =
+      s"constant ${constant.typ} ${constant.id}(${constant.params.mkString(", ")})"
+  }
+
+  case class Constant(template: ConstantTemplate, params: Seq[Var]) extends StaticSymExpr {
+    require(template.params.size == params.size)
+    template.params.zip(params).foreach {
+      case (tpl, v) =>
+        require(v.typ.isSubtypeOf(tpl.typ), s"$v is not of type ${tpl.typ}")
+    }
+
+    override def typ = template.typ
 
     override def toString = s"$template(${params.mkString(", ")})"
   }

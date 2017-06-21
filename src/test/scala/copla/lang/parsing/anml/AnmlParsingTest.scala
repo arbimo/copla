@@ -31,7 +31,8 @@ class AnmlParsingTest extends FunSuite {
     "type A with { fluent boolean f(boolean x); };",
     "type A with { fluent boolean f(B x); }; type B;",
     "type A with { fluent boolean f(boolean x); }; instance A a; [start,end] A.f(a, true) == false;",
-    "type A with { fluent boolean f(boolean x); }; instance A a; [start,end] a.f(true) == false;"
+    "type A with { fluent boolean f(boolean x); }; instance A a; [start,end] a.f(true) == false;",
+    "constant boolean f(boolean x);"
   )
 
   def invalid = Seq(
