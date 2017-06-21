@@ -1,7 +1,11 @@
 package copla.lang.parsing.anml
 
 import copla.lang.model._
-import fastparse.core.Parsed.{Failure, Success}
+
+import ParserApi.baseApi._
+import ParserApi.baseApi.Parsed.Success
+import ParserApi.whiteApi._
+import ParserApi.extendedApi._
 
 abstract class AnmlParser(val initialContext: Ctx) {
   private[this] var updatableContext = initialContext
@@ -22,14 +26,6 @@ abstract class AnmlParser(val initialContext: Ctx) {
   def findFluent(name: String): Option[FluentTemplate]     = currentContext.findFluent(name)
   def findFunction(name: String): Option[FunctionTemplate] = currentContext.findFunction(name)
 
-  val White = fastparse.WhitespaceApi.Wrapper {
-    import fastparse.all._
-    val white = CharsWhileIn(" \r\n\t")
-    NoTrace(white.rep)
-  }
-  import fastparse.noApi._
-  import White._
-
   val word: Parser[String] = {
     import fastparse.all._ // override sequence composition to ignore white spaces
     (CharIn(('a' to 'z') ++ ('A' to 'Z')) ~
@@ -37,38 +33,29 @@ abstract class AnmlParser(val initialContext: Ctx) {
   }
   val int: Parser[Int] = CharsWhileIn('0' to '9').!.map(_.toInt).opaque("int")
 
-  val typeKW            = word.filter(_ == "type").map(x => {}).opaque("type")
-  val withKW            = word.filter(_ == "with").map(x => {}).opaque("with")
-  val instanceKW        = word.filter(_ == "instance").map(_ => {}).opaque("instance")
-  val fluentKW          = word.filter(_ == "fluent").map(_ => {}).opaque("fluent")
-  val constantKW        = word.filter(_ == "constant").map(_ => {}).opaque("constant")
-  val timepointKW       = word.filter(_ == "timepoint").map(_ => {}).opaque("instance")
-  val durationKW        = word.filter(_ == "duration").map(_ => {}).opaque("duration")
+  val typeKW            = word.filter(_ == "type").silent.opaque("type")
+  val withKW            = word.filter(_ == "with").silent.opaque("with")
+  val instanceKW        = word.filter(_ == "instance").silent.opaque("instance")
+  val fluentKW          = word.filter(_ == "fluent").silent.opaque("fluent")
+  val constantKW        = word.filter(_ == "constant").silent.opaque("constant")
+  val timepointKW       = word.filter(_ == "timepoint").silent.opaque("instance")
+  val durationKW        = word.filter(_ == "duration").silent.opaque("duration")
   val keywords          = Set("type", "instance", "action", "duration", "fluent", "predicate", "timepoint")
   val reservedTypeNames = Set()
   val nonIdent          = keywords ++ reservedTypeNames
 
-  val simpleIdent              = word.opaque("ident").filter(f(!nonIdent.contains(_), "not-reserved"))
+  val simpleIdent              = word.opaque("ident").namedFilter(!nonIdent.contains(_), "not-reserved")
   val ident: Parser[String]    = simpleIdent.rep(min = 1, sep = ".").!.opaque("possibly-nested-ident")
   val typeName: Parser[String] = word.filter(!keywords.contains(_)).opaque("type-name")
   val variableName             = ident.opaque("variable-name")
 
-  /** Simple wrapper to attach a toString method to a function */
-  protected def f[T, V](f: T => V, str: String) = new Function[T, V] {
-    def apply(v: T)       = f(v)
-    override def toString = str
-  }
-
   val freeIdent =
     simpleIdent
-      .filter(
-        f(name => elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name),
-          "unused"))
+      .namedFilter(name => elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name),
+                   "unused")
 
   val declaredType: Parser[Type] =
-    typeName
-      .filter(f(findType(_).isDefined, "declared"))
-      .map(findType(_).get)
+    typeName.optGet(currentContext.findType(_), "declared")
 
   val timepointDeclaration: Parser[TimepointDeclaration] =
     timepointKW ~/
@@ -76,9 +63,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
       ";"
 
   protected val definedTP: Parser[TPRef] =
-    ident
-      .filter(f(findTimepoint(_).isDefined, "declared-timepoint"))
-      .map(findTimepoint(_).get)
+    ident.optGet(currentContext.findTimepoint(_), "declared-timepoint")
 
   val timepoint: Parser[TPRef] = {
     (int ~ "+").flatMap(d => timepoint.map(tp => tp + d)) |
@@ -133,19 +118,13 @@ abstract class AnmlParser(val initialContext: Ctx) {
   }
 
   val variable: Parser[Var] =
-    ident
-      .filter(f(findVariable(_).isDefined, "declared-variable"))
-      .map(findVariable(_).get)
+    ident.optGet(currentContext.findVariable(_), "declared-variable")
 
   val fluent: Parser[FluentTemplate] =
-    ident
-      .filter(f(findFluent(_).isDefined, "declared-fluent"))
-      .map(findFluent(_).get)
+    ident.optGet(currentContext.findFluent(_), "declared-fluent")
 
   val constantFunc: Parser[ConstantTemplate] =
-    ident
-      .filter(f(currentContext.findConstant(_).isDefined, "declared-fluent"))
-      .map(currentContext.findConstant(_).get)
+    ident.optGet(currentContext.findConstant(_), "declared-fluent")
 
   /** Parses a fluent in the object oriented notation.
     * "x.f" where x is a variable of type T and f is a fluent declared in type T or in a supertype of T.
@@ -163,11 +142,11 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .map(idents => (idents.dropRight(1), idents.last))
       // only keep if first idents represent a valid variable
       .map(tup => (findVariable(tup._1.mkString(".")), tup._2))
-      .filter(f(_._1.isDefined, "declared-variable"))
+      .namedFilter(_._1.isDefined, "declared-variable")
       .map(tup => (tup._1.get, tup._2))
       // keep if we can find the fluent in the type of the variable
-      .filter(f({ case (v, fluentName) => findInTypeFunction(v.typ, fluentName).isDefined },
-                s"fluent-available-for-this-variable-type"))
+      .namedFilter({ case (v, fluentName) => findInTypeFunction(v.typ, fluentName).isDefined },
+                   s"fluent-available-for-this-variable-type")
       // return the fluent and the variable
       .map { case (v, fluentName) => (findInTypeFunction(v.typ, fluentName).get, v) }
   }
@@ -179,7 +158,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
       PassWith(previous)
     } else {
       staticSymExpr
-        .filter(f(_.typ.isSubtypeOf(expectedTypes.head), "has-expected-type"))
+        .namedFilter(_.typ.isSubtypeOf(expectedTypes.head), "has-expected-type")
         .flatMap(
           v =>
             if (expectedTypes.tail.isEmpty)
@@ -249,9 +228,9 @@ abstract class AnmlParser(val initialContext: Ctx) {
       (freeIdent ~ ":" ~/ Pass) | PassWith(defaultId())
 
     assertionId ~
-      (timedSymExpr ~ "==" ~/ staticSymExpr).filter(f({
+      (timedSymExpr ~ "==" ~/ staticSymExpr).namedFilter({
         case (left, right) => left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
-      }, "equality-between-compatible-types"))
+      }, "equality-between-compatible-types")
   }.map {
     case (id, (left, right)) => TimedEqualAssertion(left, right, Some(currentContext), id)
   }
@@ -266,8 +245,6 @@ abstract class AnmlParser(val initialContext: Ctx) {
 /** Second phase parser that extracts all ANML elements expects types that should
   *  be already present in the initial model. */
 class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel) {
-  import fastparse.noApi._
-  import White._
 
   /** Parser for instance declaration.
     * "instance Type id1, id2, id3;" */
@@ -276,7 +253,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
     /** Parses a sequences of yet unused *distinct* identifiers. */
     def distinctFreeIdents(previous: Seq[String], sep: String, term: String): Parser[Seq[String]] =
       Pass ~ freeIdent
-        .filter(f(!previous.contains(_), "not-in-same-instance-list"))
+        .namedFilter(!previous.contains(_), "not-in-same-instance-list")
         .flatMap(name =>
           Pass ~ sep ~/ distinctFreeIdents(previous :+ name, sep, term)
             | Pass ~ term ~ PassWith(previous :+ name))
@@ -297,7 +274,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
     def distinctArgSeq(sep: String,
                        previous: Seq[(String, Type)] = Seq()): Parser[Seq[(String, Type)]] =
       Pass ~ arg
-        .filter(f(a => !previous.exists(_._1 == a._1), "not-used-in-current-arg-sequence"))
+        .namedFilter(a => !previous.exists(_._1 == a._1), "not-used-in-current-arg-sequence")
         .flatMap(a => (Pass ~ sep ~/ distinctArgSeq(sep, previous :+ a)) | PassWith(previous :+ a))
 
     ("(" ~/
@@ -380,8 +357,6 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
 
 /** First phase parser used to extract all type declarations from a given ANML string. */
 class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
-  import fastparse.noApi._
-  import White._
 
   val nonTypeToken = (word | int | CharIn("{}[]();=:<>-+.,")).!.filter(_ != "type")
   val typeDeclaration = (typeKW ~/ freeIdent ~ ("<" ~ declaredType).? ~ (";" | withKW)).map {
