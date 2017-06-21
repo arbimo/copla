@@ -67,15 +67,24 @@ package object model {
     }
   }
 
-  case class FluentTemplate(id: Id, typ: Type, params: Seq[Arg]) {
+  sealed trait FunctionTemplate {
+    def id: Id
+    def typ: Type
+    def params: Seq[Arg]
+  }
+
+  case class FluentTemplate(id: Id, typ: Type, params: Seq[Arg]) extends FunctionTemplate {
 
     override def toString = id.toString
   }
-  case class FluentDeclaration(fluent: FluentTemplate)
-      extends Declaration[FluentTemplate]
+  case class FunctionDeclaration(func: FunctionTemplate)
+      extends Declaration[FunctionTemplate]
       with ModuleElem {
-    override def id       = fluent.id
-    override def toString = s"fluent ${fluent.typ} ${fluent.id}(${fluent.params.mkString(", ")})"
+    override def id = func.id
+    override def toString = func match {
+      case _: FluentTemplate   => s"fluent ${func.typ} ${func.id}(${func.params.mkString(", ")})"
+      case _: ConstantTemplate => s"constant ${func.typ} ${func.id}(${func.params.mkString(", ")})"
+    }
   }
 
   case class Fluent(template: FluentTemplate, params: Seq[Var]) extends TimedSymExpr {
@@ -90,16 +99,9 @@ package object model {
     override def toString = s"$template(${params.mkString(", ")})"
   }
 
-  case class ConstantTemplate(id: Id, typ: Type, params: Seq[Arg]) {
+  case class ConstantTemplate(id: Id, typ: Type, params: Seq[Arg]) extends FunctionTemplate {
 
     override def toString = id.toString
-  }
-  case class ConstantDeclaration(constant: ConstantTemplate)
-      extends Declaration[ConstantTemplate]
-      with ModuleElem {
-    override def id = constant.id
-    override def toString =
-      s"constant ${constant.typ} ${constant.id}(${constant.params.mkString(", ")})"
   }
 
   case class Constant(template: ConstantTemplate, params: Seq[Var]) extends StaticSymExpr {
@@ -278,10 +280,16 @@ package object model {
         case _                    => None
       }
 
-    def findFluent(name: String): Option[FluentTemplate] =
+    def findFunction(name: String): Option[FunctionTemplate] =
       findDeclaration(name).flatMap {
-        case FluentDeclaration(t) => Some(t)
-        case _                    => None
+        case FunctionDeclaration(t) => Some(t)
+        case _                      => None
+      }
+
+    def findFluent(name: String): Option[FluentTemplate] =
+      findFunction(name).flatMap {
+        case t: FluentTemplate => Some(t)
+        case _                 => None
       }
   }
 

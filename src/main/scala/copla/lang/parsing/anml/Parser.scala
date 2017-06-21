@@ -166,23 +166,24 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .map { case (v, fluentName) => (findInTypeFluent(v.typ, fluentName).get, v) }
   }
 
-  val timedSymExpr: Parser[TimedSymExpr] = {
-    def varList(expectedTypes: Seq[Type],
-                sep: String,
-                previous: Seq[Var] = Seq()): Parser[Seq[Var]] = {
-      if (expectedTypes.isEmpty) {
-        PassWith(previous)
-      } else {
-        variable
-          .filter(f(_.typ.isSubtypeOf(expectedTypes.head), "has-expected-type"))
-          .flatMap(
-            v =>
-              if (expectedTypes.tail.isEmpty)
-                PassWith(previous :+ v)
-              else
-                Pass ~ sep ~/ varList(expectedTypes.tail, sep, previous :+ v))
-      }
+  private[this] def varList(expectedTypes: Seq[Type],
+                            sep: String,
+                            previous: Seq[Var] = Seq()): Parser[Seq[Var]] = {
+    if (expectedTypes.isEmpty) {
+      PassWith(previous)
+    } else {
+      variable
+        .filter(f(_.typ.isSubtypeOf(expectedTypes.head), "has-expected-type"))
+        .flatMap(
+          v =>
+            if (expectedTypes.tail.isEmpty)
+              PassWith(previous :+ v)
+            else
+              Pass ~ sep ~/ varList(expectedTypes.tail, sep, previous :+ v))
     }
+  }
+
+  val timedSymExpr: Parser[TimedSymExpr] = {
     (fluent ~/ Pass).flatMap(f =>
       f.params.map(param => param.typ) match {
         case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq()))
@@ -275,56 +276,53 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
       PassWith(Seq()).opaque("no-args") // no args no, parenthesis
   }
 
-  val fluentDeclaration: Parser[FluentDeclaration] = {
-    (fluentKW ~/ declaredType ~ freeIdent ~ argList ~ ";")
+  val functionDeclaration: Parser[FunctionDeclaration] = {
+    ((fluentKW | constantKW).! ~/ declaredType ~ freeIdent ~ argList ~ ";")
       .map {
-        case (typ, svName, args) =>
+        case ("fluent", typ, svName, args) =>
           FluentTemplate(id(svName), typ, args.map {
             case (name, argType) => Arg(Id(scope + svName, name), argType)
           })
-      }
-      .map(FluentDeclaration(_))
-  }
-
-  val constantDeclaration: Parser[ConstantDeclaration] = {
-    (constantKW ~/ declaredType ~ freeIdent ~ argList ~ ";")
-      .map {
-        case (typ, svName, args) =>
+        case ("constant", typ, svName, args) =>
           ConstantTemplate(id(svName), typ, args.map {
             case (name, argType) => Arg(Id(scope + svName, name), argType)
           })
+        case _ => sys.error("Match failed")
       }
-      .map(ConstantDeclaration(_))
+      .map(FunctionDeclaration(_))
   }
 
   /** Extract the functions declared in a type. This consumes the whole type declaration.
     * Note that the type should be already present in the module.
     * Typically consumed:
     *   "type B < A with { fluent f(C c); };" */
-  val inTypeFunctionDeclaration: Parser[Seq[FluentDeclaration]] =
+  val inTypeFunctionDeclaration: Parser[Seq[FunctionDeclaration]] =
     (typeKW ~/
       declaredType
       ~ ("<" ~/ declaredType.!).asInstanceOf[Parser[Type]].?
-      ~ (withKW ~/ "{" ~/ fluentDeclaration.rep ~ "}").?
+      ~ (withKW ~/ "{" ~/ functionDeclaration.rep ~ "}").?
       ~ ";")
       .map {
         case (t, _, None) => Seq()
-        case (t, _, Some(fluentDeclarations)) =>
-          fluentDeclarations.map(fd => {
-            val id            = Id(t.asScope, fd.fluent.id.name)
+        case (t, _, Some(funcDecl)) =>
+          funcDecl.map(fd => {
+            val id            = Id(t.asScope, fd.id.name)
             val functionScope = t.asScope + id.name
             val selfArg       = Arg(Id(functionScope, "self"), t)
-            val params = selfArg +: fd.fluent.params.map(arg =>
+            val params = selfArg +: fd.func.params.map(arg =>
               Arg(Id(functionScope, arg.id.name), arg.typ))
-            FluentDeclaration(FluentTemplate(id, fd.fluent.typ, params))
+            val template = fd.func match {
+              case _: FluentTemplate   => FluentTemplate(id, fd.func.typ, params)
+              case _: ConstantTemplate => ConstantTemplate(id, fd.func.typ, params)
+            }
+            FunctionDeclaration(template)
           })
       }
 
   val elem: Parser[Seq[ModuleElem]] =
     inTypeFunctionDeclaration |
       instancesDeclaration |
-      fluentDeclaration.map(Seq(_)) |
-      constantDeclaration.map(Seq(_)) |
+      functionDeclaration.map(Seq(_)) |
       timepointDeclaration.map(Seq(_)) |
       temporalConstraint |
       temporallyQualifiedAssertion.map(Seq(_))
