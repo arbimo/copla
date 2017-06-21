@@ -8,23 +8,15 @@ import ParserApi.whiteApi._
 import ParserApi.extendedApi._
 
 abstract class AnmlParser(val initialContext: Ctx) {
-  private[this] var updatableContext = initialContext
+
+  /** Denotes the current context of this AnmlParser.
+    * It is used by many suparsers to find the variable/fluent/type associated to an identifier.
+    * Over the course of Parsing, the current context is likely to change (i.e. `ctx` will point to
+    * a new context since [[Ctx]] is immutable. */
+  protected var ctx = initialContext
   protected def updateContext(newContext: Ctx) {
-    updatableContext = newContext
+    ctx = newContext
   }
-
-  def currentContext = updatableContext
-  def elems          = currentContext.elems
-  def scope          = currentContext.scope
-  def parent         = currentContext.parent
-  def root           = currentContext.root
-
-  def id(name: String): Id                                 = Id(scope, name)
-  def findVariable(name: String): Option[Var]              = currentContext.findVariable(name)
-  def findTimepoint(name: String): Option[TPRef]           = currentContext.findTimepoint(name)
-  def findType(name: String): Option[Type]                 = currentContext.findType(name)
-  def findFluent(name: String): Option[FluentTemplate]     = currentContext.findFluent(name)
-  def findFunction(name: String): Option[FunctionTemplate] = currentContext.findFunction(name)
 
   val word: Parser[String] = {
     import fastparse.all._ // override sequence composition to ignore white spaces
@@ -51,19 +43,20 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
   val freeIdent =
     simpleIdent
-      .namedFilter(name => elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name),
-                   "unused")
+      .namedFilter(
+        name => ctx.elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name),
+        "unused")
 
   val declaredType: Parser[Type] =
-    typeName.optGet(currentContext.findType(_), "declared")
+    typeName.optGet(ctx.findType(_), "declared")
 
   val timepointDeclaration: Parser[TimepointDeclaration] =
     timepointKW ~/
-      freeIdent.map(name => TimepointDeclaration(TPRef(id(name)))) ~
+      freeIdent.map(name => TimepointDeclaration(TPRef(ctx.id(name)))) ~
       ";"
 
   protected val definedTP: Parser[TPRef] =
-    ident.optGet(currentContext.findTimepoint(_), "declared-timepoint")
+    ident.optGet(ctx.findTimepoint(_), "declared-timepoint")
 
   val timepoint: Parser[TPRef] = {
     (int ~ "+").flatMap(d => timepoint.map(tp => tp + d)) |
@@ -75,7 +68,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
       } |
       int.flatMap(
         i => // integer as a tp defined relatively to the global start, if one exists
-          root.findTimepoint("start") match {
+          ctx.root.findTimepoint("start") match {
             case Some(st) => PassWith(st + i)
             case None     => Fail.opaque("fail:no start timepoint in top level scope")
         })
@@ -83,11 +76,14 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
   val delay: Parser[Delay] =
     (durationKW ~/ Pass)
-      .flatMap(_ =>
-        findTimepoint("start").flatMap(st => findTimepoint("end").map(ed => (st, ed))) match {
-          case Some((st, ed)) => PassWith(Delay(st, ed + 1))
-          case None           => sys.error("No start/end timepoint"); Fail
-      })
+      .flatMap(
+        _ =>
+          ctx
+            .findTimepoint("start")
+            .flatMap(st => ctx.findTimepoint("end").map(ed => (st, ed))) match {
+            case Some((st, ed)) => PassWith(Delay(st, ed + 1))
+            case None           => sys.error("No start/end timepoint"); Fail
+        })
       .opaque("duration") |
       (timepoint ~ "-" ~ definedTP ~ (("+" | "-").! ~ int).?).map {
         case (t1, t2, None)           => t1 - t2
@@ -118,13 +114,13 @@ abstract class AnmlParser(val initialContext: Ctx) {
   }
 
   val variable: Parser[Var] =
-    ident.optGet(currentContext.findVariable(_), "declared-variable")
+    ident.optGet(ctx.findVariable(_), "declared-variable")
 
   val fluent: Parser[FluentTemplate] =
-    ident.optGet(currentContext.findFluent(_), "declared-fluent")
+    ident.optGet(ctx.findFluent(_), "declared-fluent")
 
   val constantFunc: Parser[ConstantTemplate] =
-    ident.optGet(currentContext.findConstant(_), "declared-fluent")
+    ident.optGet(ctx.findConstant(_), "declared-fluent")
 
   /** Parses a fluent in the object oriented notation.
     * "x.f" where x is a variable of type T and f is a fluent declared in type T or in a supertype of T.
@@ -133,15 +129,16 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
     /** Retrieves a fluent template declared the the given type or one of its super types.*/
     def findInTypeFunction(typ: Type, fluentName: String): Option[FunctionTemplate] =
-      findFunction(typ.id.name + "." + fluentName).orElse(typ.parent.flatMap(p =>
-        findInTypeFunction(p, fluentName)))
+      ctx
+        .findFunction(typ.id.name + "." + fluentName)
+        .orElse(typ.parent.flatMap(p => findInTypeFunction(p, fluentName)))
 
     ident
       .map(str => str.split("\\.").toList)
       // split into first idents (variable) and last (fluent name)
       .map(idents => (idents.dropRight(1), idents.last))
       // only keep if first idents represent a valid variable
-      .map(tup => (findVariable(tup._1.mkString(".")), tup._2))
+      .map(tup => (ctx.findVariable(tup._1.mkString(".")), tup._2))
       .namedFilter(_._1.isDefined, "declared-variable")
       .map(tup => (tup._1.get, tup._2))
       // keep if we can find the fluent in the type of the variable
@@ -232,7 +229,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
         case (left, right) => left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
       }, "equality-between-compatible-types")
   }.map {
-    case (id, (left, right)) => TimedEqualAssertion(left, right, Some(currentContext), id)
+    case (id, (left, right)) => TimedEqualAssertion(left, right, Some(ctx), id)
   }
 
   val temporallyQualifiedAssertion: Parser[TemporallyQualifiedAssertion] = {
@@ -259,7 +256,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
             | Pass ~ term ~ PassWith(previous :+ name))
 
     (instanceKW ~/ declaredType ~/ distinctFreeIdents(Nil, ",", ";"))
-      .map { case (typ, instanceNames) => instanceNames.map(name => Instance(id(name), typ)) }
+      .map { case (typ, instanceNames) => instanceNames.map(name => Instance(ctx.id(name), typ)) }
   }.map(instances => instances.map(InstanceDeclaration(_)))
 
   /** Parses a sequence of args necessarily enclosed in parenthesis if non empty
@@ -287,12 +284,12 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
     ((fluentKW | constantKW).! ~/ declaredType ~ freeIdent ~ argList ~ ";")
       .map {
         case ("fluent", typ, svName, args) =>
-          FluentTemplate(id(svName), typ, args.map {
-            case (name, argType) => Arg(Id(scope + svName, name), argType)
+          FluentTemplate(ctx.id(svName), typ, args.map {
+            case (name, argType) => Arg(Id(ctx.scope + svName, name), argType)
           })
         case ("constant", typ, svName, args) =>
-          ConstantTemplate(id(svName), typ, args.map {
-            case (name, argType) => Arg(Id(scope + svName, name), argType)
+          ConstantTemplate(ctx.id(svName), typ, args.map {
+            case (name, argType) => Arg(Id(ctx.scope + svName, name), argType)
           })
         case _ => sys.error("Match failed")
       }
@@ -334,7 +331,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
       temporalConstraint |
       temporallyQualifiedAssertion.map(Seq(_))
 
-  private[this] def currentModel: Model = currentContext match {
+  private[this] def currentModel: Model = ctx match {
     case m: Model => m
     case x        => sys.error("Current context is not a model")
   }
@@ -360,10 +357,10 @@ class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
 
   val nonTypeToken = (word | int | CharIn("{}[]();=:<>-+.,")).!.filter(_ != "type")
   val typeDeclaration = (typeKW ~/ freeIdent ~ ("<" ~ declaredType).? ~ (";" | withKW)).map {
-    case (name, parentOpt) => TypeDeclaration(Type(id(name), parentOpt))
+    case (name, parentOpt) => TypeDeclaration(Type(ctx.id(name), parentOpt))
   }
 
-  private[this] def currentModel: Model = currentContext match {
+  private[this] def currentModel: Model = ctx match {
     case m: Model => m
     case x        => sys.error("Current context is not a model")
   }
