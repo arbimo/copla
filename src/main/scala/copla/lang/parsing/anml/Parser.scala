@@ -47,7 +47,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
   val nonIdent          = keywords ++ reservedTypeNames
 
   val simpleIdent              = word.opaque("ident").filter(f(!nonIdent.contains(_), "not-reserved"))
-  val ident: Parser[String]    = simpleIdent.rep(min = 1, sep = ".").!
+  val ident: Parser[String]    = simpleIdent.rep(min = 1, sep = ".").!.opaque("possibly-nested-ident")
   val typeName: Parser[String] = word.filter(!keywords.contains(_)).opaque("type-name")
   val variableName             = ident.opaque("variable-name")
 
@@ -140,6 +140,31 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .filter(f(findFluent(_).isDefined, "declared-fluent"))
       .map(findFluent(_).get)
 
+  /** Parses a fluent in the object oriented notation.
+    * "x.f" where x is a variable of type T and f is a fluent declared in type T or in a supertype of T.
+    * Returns the fluent T.f and x which is to be the first argument of T.f */
+  val partiallyAppliedFluent: Parser[(FluentTemplate, Var)] = {
+
+    /** Retrieves a fluent template declared the the given type or one of its super types.*/
+    def findInTypeFluent(typ: Type, fluentName: String): Option[FluentTemplate] =
+      findFluent(typ.id.name + "." + fluentName).orElse(typ.parent.flatMap(p =>
+        findInTypeFluent(p, fluentName)))
+
+    ident
+      .map(str => str.split("\\.").toList)
+      // split into first idents (variable) and last (fluent name)
+      .map(idents => (idents.dropRight(1), idents.last))
+      // only keep if first idents represent a valid variable
+      .map(tup => (findVariable(tup._1.mkString(".")), tup._2))
+      .filter(f(_._1.isDefined, "declared-variable"))
+      .map(tup => (tup._1.get, tup._2))
+      // keep if we can find the fluent in the type of the variable
+      .filter(f({ case (v, fluentName) => findInTypeFluent(v.typ, fluentName).isDefined },
+                s"fluent-available-for-this-variable-type"))
+      // return the fluent and the variable
+      .map { case (v, fluentName) => (findInTypeFluent(v.typ, fluentName).get, v) }
+  }
+
   val timedSymExpr: Parser[TimedSymExpr] = {
     def varList(expectedTypes: Seq[Type],
                 sep: String,
@@ -162,7 +187,16 @@ abstract class AnmlParser(val initialContext: Ctx) {
         case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq()))
         case paramTypes =>
           "(" ~/ varList(paramTypes, ",").map(args => Fluent(f, args)) ~ ")" ~/ Pass
-    })
+    }) |
+      (partiallyAppliedFluent ~/ Pass).flatMap {
+        case (f, firstArg) =>
+          f.params.map(param => param.typ) match {
+            case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq(firstArg)))
+            case paramTypes =>
+              "(" ~/ varList(paramTypes.tail, ",")
+                .map(args => Fluent(f, firstArg +: args)) ~ ")" ~/ Pass
+          }
+      }
   }
 
   val staticSymExpr: Parser[StaticSymExpr] =
