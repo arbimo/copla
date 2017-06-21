@@ -32,6 +32,10 @@ class AnmlParsingTest extends FunSuite {
     "type A with { fluent boolean f(B x); constant boolean g(boolean x); }; type B;",
     "type A with { fluent boolean f(boolean x); }; instance A a; [start,end] A.f(a, true) == false;",
     "type A with { fluent boolean f(boolean x); }; instance A a; [start,end] a.f(true) == false;",
+    "type A with { fluent boolean f(boolean x); constant boolean g;}; instance A a; [start,end] a.f(a.g()) == a.g();",
+    "fluent boolean f(boolean x); constant boolean g(boolean arg); constant boolean h; [start,end] f(true) == g(h);",
+    "fluent boolean f(boolean x); constant boolean g(boolean arg); constant boolean h(boolean arg); [start,end] f(g(true)) == g(h(true));",
+    "constant boolean x(boolean arg); constant boolean y; ",
     "constant boolean f(boolean x); fluent boolean g(boolean x); [start,end] g(true) == f(false);"
   )
 

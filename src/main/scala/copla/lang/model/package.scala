@@ -87,7 +87,7 @@ package object model {
     }
   }
 
-  case class Fluent(template: FluentTemplate, params: Seq[Var]) extends TimedSymExpr {
+  case class Fluent(template: FluentTemplate, params: Seq[StaticSymExpr]) extends TimedSymExpr {
     require(template.params.size == params.size)
     template.params.zip(params).foreach {
       case (tpl, v) =>
@@ -104,7 +104,8 @@ package object model {
     override def toString = id.toString
   }
 
-  case class Constant(template: ConstantTemplate, params: Seq[Var]) extends StaticSymExpr {
+  case class Constant(template: ConstantTemplate, params: Seq[StaticSymExpr])
+      extends StaticSymExpr {
     require(template.params.size == params.size)
     template.params.zip(params).foreach {
       case (tpl, v) =>

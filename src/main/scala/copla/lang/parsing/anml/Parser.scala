@@ -174,11 +174,11 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
   private[this] def varList(expectedTypes: Seq[Type],
                             sep: String,
-                            previous: Seq[Var] = Seq()): Parser[Seq[Var]] = {
+                            previous: Seq[StaticSymExpr] = Seq()): Parser[Seq[StaticSymExpr]] = {
     if (expectedTypes.isEmpty) {
       PassWith(previous)
     } else {
-      variable
+      staticSymExpr
         .filter(f(_.typ.isSubtypeOf(expectedTypes.head), "has-expected-type"))
         .flatMap(
           v =>
@@ -203,7 +203,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
       (partiallyAppliedFluent ~/ Pass).flatMap {
         case (f, firstArg) =>
           f.params.map(param => param.typ) match {
-            case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq(firstArg)))
+            case Seq(singleParam) => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq(firstArg)))
             case paramTypes =>
               "(" ~/ varList(paramTypes.tail, ",")
                 .map(args => Fluent(f, firstArg +: args)) ~ ")" ~/ Pass
@@ -215,17 +215,18 @@ abstract class AnmlParser(val initialContext: Ctx) {
     val partiallyAppliedConstant = partiallyAppliedFunction
       .filter(_._1.isInstanceOf[ConstantTemplate])
       .map(tup => (tup._1.asInstanceOf[ConstantTemplate], tup._2))
+
     variable |
-    (constantFunc ~/ Pass).flatMap(f =>
-      f.params.map(param => param.typ) match {
-        case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Constant(f, Seq()))
-        case paramTypes =>
-          "(" ~/ varList(paramTypes, ",").map(args => Constant(f, args)) ~ ")" ~/ Pass
-    }) |
+      (constantFunc ~/ Pass).flatMap(f =>
+        f.params.map(param => param.typ) match {
+          case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Constant(f, Seq()))
+          case paramTypes =>
+            "(" ~/ varList(paramTypes, ",").map(args => Constant(f, args)) ~ ")" ~/ Pass
+      }) |
       (partiallyAppliedConstant ~/ Pass).flatMap {
         case (f, firstArg) =>
           f.params.map(param => param.typ) match {
-            case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Constant(f, Seq(firstArg)))
+            case Seq(singleParam) => (("(" ~/ ")") | Pass) ~ PassWith(Constant(f, Seq(firstArg)))
             case paramTypes =>
               "(" ~/ varList(paramTypes.tail, ",")
                 .map(args => Constant(f, firstArg +: args)) ~ ")" ~/ Pass
@@ -234,7 +235,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
   }
 
   val symExpr: Parser[SymExpr] =
-    timedSymExpr
+    timedSymExpr | staticSymExpr
 
   val interval: Parser[Interval] =
     ("[" ~/ timepoint ~ "," ~/ timepoint ~ "]").map {
