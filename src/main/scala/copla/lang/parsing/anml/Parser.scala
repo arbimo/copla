@@ -203,17 +203,6 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
   import fastparse.noApi._
   import White._
 
-  /** Extract the function declared in a type. THis consumes the whole type declaration.
-    * Note that the type should be already present in the module.
-    * Typically consumed:
-    *   "type B < A with { fluent f(C c); };" */
-  val inTypeFunctionDeclaration: Parser[Seq[FluentDeclaration]] =
-    (typeKW ~/
-      declaredType
-      ~ ("<" ~/ declaredType.!).asInstanceOf[Parser[Type]].?
-      ~ ";")
-      .map { case (t, _) => Seq() }
-
   /** Parser for instance declaration.
     * "instance Type id1, id2, id3;" */
   val instancesDeclaration: Parser[Seq[InstanceDeclaration]] = {
@@ -261,6 +250,29 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
       .map(FluentDeclaration(_))
   }
 
+  /** Extract the functions declared in a type. This consumes the whole type declaration.
+    * Note that the type should be already present in the module.
+    * Typically consumed:
+    *   "type B < A with { fluent f(C c); };" */
+  val inTypeFunctionDeclaration: Parser[Seq[FluentDeclaration]] =
+    (typeKW ~/
+      declaredType
+      ~ ("<" ~/ declaredType.!).asInstanceOf[Parser[Type]].?
+      ~ (withKW ~/ "{" ~/ fluentDeclaration.rep ~ "}").?
+      ~ ";")
+      .map {
+        case (t, _, None) => Seq()
+        case (t, _, Some(fluentDeclarations)) =>
+          fluentDeclarations.map(fd => {
+            val id            = Id(t.asScope, fd.fluent.id.name)
+            val functionScope = t.asScope + id.name
+            val selfArg       = Arg(Id(functionScope, "self"), t)
+            val params = selfArg +: fd.fluent.params.map(arg =>
+              Arg(Id(functionScope, arg.id.name), arg.typ))
+            FluentDeclaration(FluentTemplate(id, fd.fluent.typ, params))
+          })
+      }
+
   val elem: Parser[Seq[ModuleElem]] =
     inTypeFunctionDeclaration |
       instancesDeclaration |
@@ -295,7 +307,7 @@ class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
   import fastparse.noApi._
   import White._
 
-  val nonTypeToken = (word | int | CharIn("[]();=:<>-+.,")).!.filter(_ != "type")
+  val nonTypeToken = (word | int | CharIn("{}[]();=:<>-+.,")).!.filter(_ != "type")
   val typeDeclaration = (typeKW ~/ freeIdent ~ ("<" ~ declaredType).? ~ (";" | withKW)).map {
     case (name, parentOpt) => TypeDeclaration(Type(id(name), parentOpt))
   }

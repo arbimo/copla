@@ -213,11 +213,10 @@ package object model {
       case any: Any         => Seq(any)
     }
 
-    private[this] lazy val declarations: Map[String, Declaration[_]] =
+    private[this] lazy val declarations: Map[Id, Declaration[_]] =
       allElems.collect {
         case x: Declaration[_] => {
-          assert(x.id.scope == this.scope)
-          (x.id.name, x)
+          (x.id, x)
         }
       }.toMap
 
@@ -228,14 +227,20 @@ package object model {
 
     def id(name: String): Id = Id(scope, name)
 
-    def findDeclaration(name: String): Option[Declaration[_]] = {
-      (name.split("\\.").toList match {
+    def findDeclaration(localID: String): Option[Declaration[_]] = {
+      (localID.split("\\.").toList match {
         case single :: Nil =>
-          declarations.get(single)
-        case head :: tail =>
-          subContexts.get(head).flatMap(sc => sc.findDeclaration(tail.mkString(".")))
+          declarations.get(id(single))
+        case subScopeName :: name :: Nil =>
+          declarations
+            .get(Id(scope + subScopeName, name))
+            .orElse(
+              subContexts.get(subScopeName).flatMap(_.findDeclaration(name))
+            )
         case Nil =>
           sys.error("Invalid name: " + name)
+        case _ =>
+          sys.error(s"No support for multiple nested declarations: $name")
       }).orElse(parent.flatMap(_.findDeclaration(name)))
     }
 
