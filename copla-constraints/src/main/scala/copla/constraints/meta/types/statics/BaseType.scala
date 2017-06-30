@@ -18,13 +18,11 @@ class BaseType[T](val name: String, _instances: Seq[(T, Int)]) extends Type[T] {
 
   override def subTypes = Nil
 
-  override def instanceToInt[ST >: T](instance: ST): Int =
-    if (hasInstance(instance))
-      _instancesToInt(instance.asInstanceOf[T])
-    else
-      throw new IllegalArgumentException
+  override def instanceToIntOption[ST >: T](instance: ST): Option[Int] =
+    _instancesToInt.get(instance.asInstanceOf[T])
 
-  override def intToInstance(value: Int): T = _intToInstances(value)
+  override def intToInstanceOption(value: Int): Option[T] =
+    _intToInstances.get(value)
 
   override def hasValue(value: Int): Boolean = _intToInstances.contains(value)
 

@@ -43,4 +43,30 @@ class TypeTest extends FunSuite with BeforeAndAfter {
     assert(ABT.hasInstance(a2))
     assert(ABT.hasInstance(b1))
   }
+
+  test("type hierarchy with instances in top type") {
+    class AB
+    class A extends AB
+    class B extends AB
+    val a1 = new A
+    val a2 = new A
+    val b1 = new B
+    val ab1 = new AB
+    val ab2 = new AB
+
+    val AT = new BaseType[A]("A", List((a1, 0), (a2, 1)))
+    val BT = new BaseType[B]("B", List((b1, 2)))
+    val ABT = new ComposedType[AB](List(AT, BT), List((ab1, 3), (ab2, 4)))
+
+    println(ABT.instances)
+    assert(ABT.hasInstance(a1))
+    assert(ABT.hasInstance(a2))
+    assert(ABT.hasInstance(b1))
+    assert(ABT.hasInstance(ab1))
+    assert(ABT.hasInstance(ab2))
+    assert(ABT.instanceToInt(ab2) == 4)
+    assert(ABT.instanceToInt(a1) == 0)
+    assert(ABT.intToInstance(0) == a1)
+    assert(ABT.intToInstance(3) == ab1)
+  }
 }

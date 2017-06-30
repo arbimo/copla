@@ -22,10 +22,23 @@ trait Type[+T] extends DynamicType[T] {
 
   /** Retrieves the int representation of given instance of this type.
     * Each instance must have a distinct int value. */
-  def instanceToInt[ST >: T](instance: ST): Int
+  def instanceToIntOption[ST >: T](instance: ST): Option[Int]
 
   /** Retrieves the instance associated with tis type. */
-  def intToInstance(value: Int): T
+  def intToInstanceOption(value: Int): Option[T]
+
+  def instanceToInt[ST >: T](instance: ST): Int =
+    instanceToIntOption(instance) match {
+      case Some(x) => x
+      case None    => sys.error(s"Type $this has no instance $instance")
+    }
+
+  def intToInstance(value: Int): T = {
+    intToInstanceOption(value) match {
+      case Some(x) => x
+      case None    => sys.error(s"Type $this has no instance represented by $value")
+    }
+  }
 
   /** Returns true if the given instance is part of this type. */
   def hasInstance[ST >: T](instance: ST) = instances.contains(instance)
