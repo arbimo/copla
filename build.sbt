@@ -6,7 +6,7 @@ val _version = "0.1-SNAPSHOT"
 val _scalaVersion = "2.12.2"
 
 lazy val root = project.in(file(".")).
-  aggregate(coplaLang).
+  aggregate(coplaLang, coplaConstraints).
   settings(
     publish := {},
     publishLocal := {}
@@ -37,5 +37,12 @@ lazy val coplaLang = project.in(file("copla-lang"))
   .settings(commonSettings: _*)
   .settings(libraryDependencies ++= Seq(
     "com.lihaoyi" %% "fastparse" % "0.4.3",
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+  ))
+
+lazy val coplaConstraints = project.in(file("copla-constraints"))
+  .settings(name := "copla-constraints")
+  .settings(commonSettings: _*)
+  .settings(libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.1" % "test"
   ))

@@ -1,4 +1,6 @@
-package copla.util
+package copla.constraints.meta.util
+
+import java.lang.management.ManagementFactory
 
 import scala.annotation.elidable
 import scala.annotation.elidable._
@@ -16,35 +18,69 @@ import scala.annotation.elidable._
   *
   * Assertion can be remove at compile time with "-Xelide-below" parameter to scalac.
   */
-object exception {
+object Assertion {
 
-  var DEBUG_LEVEL = 3
+  /** By default, debug level is set to 3 if java assertions are enabled (with VM option "-ea") and 1 otherwise */
+  var DEBUG_LEVEL =
+    if (ManagementFactory.getRuntimeMXBean.getInputArguments.contains("-ea"))
+      3
+    else
+      1
 
   @elidable(ASSERTION)
   @inline
-  final def assert1(assertion: => Boolean, message: => Any = {}) {
+  final def assert1(assertion: => Boolean, message: => Any) {
     if (DEBUG_LEVEL >= 1 && !assertion)
       throw new java.lang.AssertionError("assertion failed: " + message)
   }
 
   @elidable(FINE)
   @inline
-  final def assert2(assertion: => Boolean, message: => Any = {}) {
+  final def assert2(assertion: => Boolean, message: => Any) {
     if (DEBUG_LEVEL >= 2 && !assertion)
       throw new java.lang.AssertionError("assertion failed: " + message)
   }
 
   @elidable(FINER)
   @inline
-  final def assert3(assertion: => Boolean, message: => Any = {}) {
+  final def assert3(assertion: => Boolean, message: => Any) {
     if (DEBUG_LEVEL >= 3 && !assertion)
       throw new java.lang.AssertionError("assertion failed: " + message)
   }
 
   @elidable(FINEST)
   @inline
-  final def assert4(assertion: => Boolean, message: => Any = {}) {
+  final def assert4(assertion: => Boolean, message: => Any) {
     if (DEBUG_LEVEL >= 4 && !assertion)
       throw new java.lang.AssertionError("assertion failed: " + message)
   }
+
+  @elidable(ASSERTION)
+  @inline
+  final def assert1(assertion: => Boolean) {
+    if (DEBUG_LEVEL >= 1 && !assertion)
+      throw new java.lang.AssertionError("assertion failed")
+  }
+
+  @elidable(FINE)
+  @inline
+  final def assert2(assertion: => Boolean) {
+    if (DEBUG_LEVEL >= 2 && !assertion)
+      throw new java.lang.AssertionError("assertion failed")
+  }
+
+  @elidable(FINER)
+  @inline
+  final def assert3(assertion: => Boolean) {
+    if (DEBUG_LEVEL >= 3 && !assertion)
+      throw new java.lang.AssertionError("assertion failed")
+  }
+
+  @elidable(FINEST)
+  @inline
+  final def assert4(assertion: => Boolean) {
+    if (DEBUG_LEVEL >= 4 && !assertion)
+      throw new java.lang.AssertionError("assertion failed")
+  }
+
 }

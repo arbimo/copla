@@ -1,0 +1,24 @@
+package copla.constraints.meta.stn.constraint
+
+import copla.constraints.meta.CSP
+import copla.constraints.meta.constraints.ConstraintSatisfaction
+import copla.constraints.meta.stn.variables.Timepoint
+import copla.constraints.meta.variables.IVar
+
+class AbsoluteAfterConstraint(val tp: Timepoint, val deadline: Int) extends TemporalConstraint {
+
+  override def satisfaction(implicit csp: CSP): Satisfaction =
+    if (tp.domain.lb >= deadline)
+      ConstraintSatisfaction.SATISFIED
+    else if (tp.domain.ub < deadline)
+      ConstraintSatisfaction.VIOLATED
+    else
+      ConstraintSatisfaction.UNDEFINED
+
+  override def variables(implicit csp: CSP): Set[IVar] =
+    Set(csp.varStore.getDelayVariable(csp.temporalOrigin, tp))
+
+  override def toString = s"$tp >= $deadline"
+
+  override def reverse: AbsoluteBeforeConstraint = tp < deadline
+}
