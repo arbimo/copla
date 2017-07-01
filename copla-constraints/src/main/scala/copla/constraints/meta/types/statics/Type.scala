@@ -1,6 +1,6 @@
 package copla.constraints.meta.types.statics
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.types.dynamics.DynamicType
 
@@ -13,7 +13,7 @@ trait Type[+T] extends DynamicType[T] {
 
   override def isStatic = true
 
-  override def static(implicit csp: CSP) = this
+  override def static(implicit csp: CSPView) = this
 
   override def subTypes: Seq[Type[T]]
 

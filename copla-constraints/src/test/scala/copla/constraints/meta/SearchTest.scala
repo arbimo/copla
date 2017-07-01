@@ -22,8 +22,7 @@ class SearchTest extends FunSuite with BeforeAndAfter {
     csp.post(v1 =!= v3)
 
     val ret = BinarySearch.search(csp)
-    assert(ret != null)
-    println(ret.report)
+    assert(ret.isSolution)
   }
 
   test("Simple impossible search") {
@@ -33,6 +32,6 @@ class SearchTest extends FunSuite with BeforeAndAfter {
     csp.post(v1 =!= v3)
 
     val ret = BinarySearch.search(csp)
-    assert(ret == null)
+    assert(!ret.isSolution)
   }
 }

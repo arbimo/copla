@@ -1,6 +1,6 @@
 package copla.constraints.meta.types.dynamics
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.types.statics.{DomainView, Type}
 import copla.constraints.meta.types.statics.Type
@@ -13,7 +13,7 @@ class DynTypedVariable[T](val typ: DynamicType[T], ref: Option[Any] = None)
 
   def this(ref: Any, typ: Type[T]) = this(typ, Some(ref))
 
-  override def initialDomain(implicit csp: CSP): Domain = typ.static.asDomain
+  override def initialDomain(implicit csp: CSPView): Domain = typ.static.asDomain
 
   def dom(implicit csp: CSP): DomainView[T] = new DomainView[T](domain, typ.static)
 }

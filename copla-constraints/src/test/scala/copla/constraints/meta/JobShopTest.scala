@@ -1,6 +1,6 @@
 package copla.constraints.meta
 
-import copla.constraints.meta.search.BinarySearch
+import copla.constraints.meta.search.{BinarySearch, Solution}
 import copla.constraints.meta.stn.variables.TemporalInterval
 import copla.constraints.meta.variables.IntVariable
 import org.scalatest.FunSuite
@@ -14,8 +14,10 @@ class JobShopTest extends FunSuite {
     val (model, jobs) = jobShopModel(instance)
 
     BinarySearch.count = 0
-    implicit val csp = BinarySearch.search(model, optimizeMakespan = true)
-    assert(csp != null)
+    implicit val csp = BinarySearch.search(model, optimizeMakespan = true) match {
+      case Solution(sol) => sol
+      case _ => throw new AssertionError("no solution returned")
+    }
     assert(csp.isSolution)
     assert(instance.optimalMakespan.isEmpty || csp.makespan == instance.optimalMakespan.get)
 

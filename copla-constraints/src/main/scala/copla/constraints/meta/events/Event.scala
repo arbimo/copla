@@ -21,7 +21,7 @@ case class DomainReduced(override val variable: VarWithDomain) extends DomainCha
 
 case class DomainExtended(override val variable: VarWithDomain) extends DomainChange(variable)
 
-case class Satisfied(constraint: Constraint) extends CSPEvent
+case class Satisfaction(constraint: Constraint) extends CSPEvent
 
 trait WatchedSatisfactionUpdate extends CSPEvent {
   def constraint: Constraint

@@ -82,7 +82,6 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
       for (v <- constraint.variables)
         watchedConstraintsForVar.getOrElseUpdate(v, mutable.ArrayBuffer()) += constraint
       csp.addEvent(WatchConstraint(constraint))
-      constraint.onWatch
     }
     watchers(constraint) += watcher
     watches.getOrElseUpdate(watcher, mutable.ArrayBuffer()) += constraint
@@ -134,9 +133,9 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
 
   /** Handle events that should be handled before all other components,
     * mainly to record new constraints. */
-  def handleEventFirst(event: Event) {
+  def handleEventFirst(event: Event) = {
     event match {
-      case Satisfied(constraint) =>
+      case Satisfaction(constraint) =>
         onSatisfaction(constraint)
       case NewConstraint(constraint) =>
         record(constraint)

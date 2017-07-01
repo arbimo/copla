@@ -1,69 +1,71 @@
 package copla.constraints.meta.constraints
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints.ConstraintSatisfaction._
-import copla.constraints.meta.domains.BooleanDomain
-import copla.constraints.meta.events.{DomainChange, Event}
+import copla.constraints.meta.domains.{BooleanDomain, Domain}
+import copla.constraints.meta.events.{Event, NewConstraint, WatchedSatisfied, WatchedViolated}
 import copla.constraints.meta.variables.ReificationVariable
-import copla.constraints.meta.events._
 import copla.constraints.meta.variables.IVar
 
 class ReificationConstraint(val reiVar: ReificationVariable, val constraint: Constraint)
     extends Constraint {
   require(reiVar.constraint == constraint)
 
-  override def variables(implicit csp: CSP): Set[IVar] = Set(reiVar)
+  override def variables(implicit csp: CSPView): Set[IVar] = Set(reiVar)
 
-  override def subconstraints(implicit csp: CSP) = Set(constraint)
+  override def subconstraints(implicit csp: CSPView) = Set(constraint)
 
-  override def _propagate(event: Event)(implicit csp: CSP): Unit = {
+  override def propagate(event: Event)(implicit csp: CSPView): PropagationResult = {
     event match {
-      case NewConstraint(c) if c == this =>
-        checkVariable
-        checkConstraint
-      case event: DomainChange =>
+      case event: UpdateDomain =>
         assert(event.variable == reiVar)
-        checkVariable
+        if (reiVar.boundTo(1)) {
+          // reification var to true
+          if (constraint.isSatisfied)
+            Satisfied()
+          else if (constraint.isViolated)
+            Inconsistency
+          else
+            Undefined(Post(constraint))
+        } else if (reiVar.boundTo(0)) {
+          // reification var to false
+          if (constraint.isViolated)
+            Satisfied()
+          else if (constraint.isSatisfied)
+            Inconsistency
+          else
+            Undefined(Post(constraint.reverse))
+        } else if (reiVar.domain.isEmpty) {
+          // reification var is neither nor false
+          Inconsistency
+        } else {
+          // reification var is true or false
+          Undefined()
+        }
       case WatchedSatisfied(c) =>
         assert(c == constraint)
-        csp.updateDomain(reiVar, reiVar.domain - 0)
+        if (reiVar.domain.contains(1))
+          Satisfied(UpdateDomain(reiVar, Domain(1)))
+        else
+          Inconsistency
       case WatchedViolated(c) =>
         assert(c == constraint)
-        csp.updateDomain(reiVar, reiVar.domain - 1)
+        if (reiVar.domain.contains(0))
+          Satisfied(UpdateDomain(reiVar, Domain(0)))
+        else
+          Inconsistency
+      case _ =>
+        PropagationResult.from(satisfaction)
     }
   }
 
-  private def checkVariable(implicit csp: CSP) {
-    val dom = csp.dom(reiVar)
-    if (dom.isSingleton && dom.contains(1)) {
-      csp.post(constraint)
-    } else if (dom.isSingleton && dom.contains(0)) {
-      csp.post(constraint.reverse)
+  override def satisfaction(implicit csp: CSPView): Satisfaction = {
+    if (reiVar.boundTo(1)) {
+      constraint.satisfaction
+    } else if (reiVar.boundTo(0)) {
+      constraint.reverse.satisfaction
     } else {
-      assert(dom.size == 2, "Reification variable should never have an empty domain")
-    }
-  }
-
-  private def checkConstraint(implicit csp: CSP) {
-    if (constraint.isSatisfied)
-      csp.updateDomain(reiVar, new BooleanDomain(Set(true)))
-    else if (constraint.isViolated)
-      csp.updateDomain(reiVar, new BooleanDomain(Set(false)))
-  }
-
-  override def satisfaction(implicit csp: CSP): Satisfaction = {
-    val dom  = csp.dom(reiVar)
-    val cSat = constraint.satisfaction
-    if (dom.isSingleton && dom.contains(1)) {
-      if (cSat == SATISFIED) SATISFIED
-      else if (cSat == UNDEFINED) UNDEFINED
-      else VIOLATED
-    } else if (dom.isSingleton && dom.contains(0)) {
-      if (cSat == SATISFIED) VIOLATED
-      else if (cSat == UNDEFINED) UNDEFINED
-      else SATISFIED
-    } else {
-      assert(dom.size == 2, "Reification variable should never have an empty domain")
+      assert(!reiVar.domain.isEmpty, "Reification variable should never have an empty domain")
       UNDEFINED
     }
   }

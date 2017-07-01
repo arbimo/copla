@@ -1,7 +1,7 @@
 package copla.constraints.meta
 
 import copla.constraints.meta.constraints.DisjunctiveConstraint
-import copla.constraints.meta.search.BinarySearch
+import copla.constraints.meta.search.{BinarySearch, Solution}
 import copla.constraints.meta.stn.constraint.MinDelay
 import copla.constraints.meta.stn.variables.TemporalInterval
 import copla.constraints.meta.types.statics.{BaseType, TypedVariable}
@@ -10,14 +10,17 @@ import org.scalatest.FunSuite
 
 class JobShopWithTypesTest extends FunSuite {
 
-   val instance = new JobShopInstance(4, List(List(2, 4, 2, 1), List(5, 3, 2), List(3, 5, 7)), Some(14))
+  val instance = new JobShopInstance(4, List(List(2, 4, 2, 1), List(5, 3, 2), List(3, 5, 7)), Some(14))
 //  val instance = new JobShopInstance(2, List(List(2, 4), List(4, 3, 3)), None) // very simple instance to avoid taking time in unit tests
 
   test("job shop search with types") {
     val (model, jobs) = jobShopModel(instance)
     BinarySearch.count = 0
-    implicit var csp = BinarySearch.search(model, optimizeMakespan = true)
-    assert(csp != null)
+
+    implicit val csp = BinarySearch.search(model, optimizeMakespan = true) match {
+      case Solution(sol) => sol
+      case _ => throw new AssertionError("no solution returned")
+    }
     assert(csp.isSolution)
     assert(instance.optimalMakespan.isEmpty || csp.makespan == instance.optimalMakespan.get)
 

@@ -1,6 +1,6 @@
 package copla.constraints.meta.types
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPUpdateResult}
 import copla.constraints.meta.events.{Event, InternalCSPEventHandler}
 import copla.constraints.meta.types.dynamics.{DynTypedVariable, DynamicType}
 import copla.constraints.meta.types.statics.Type
@@ -30,7 +30,7 @@ final class TypesStore(_csp: CSP, base: Option[TypesStore] = None)
   def asStaticType[T](dynamicType: DynamicType[T]): Type[T] =
     dynamicToStatic.getOrElse(dynamicType, dynamicType.defaultStatic).asInstanceOf[Type[T]]
 
-  override def handleEvent(event: Event) {
+  override def handleEvent(event: Event): CSPUpdateResult = {
     event match {
       case NewVariableEvent(v: DynTypedVariable[_]) =>
         if (!v.typ.isStatic) {
@@ -39,6 +39,7 @@ final class TypesStore(_csp: CSP, base: Option[TypesStore] = None)
           for (t <- v.typ :: v.typ.subTypes.toList if !t.isStatic && t.subTypes.isEmpty)
             varsByType.getOrElseUpdate(t, mutable.ArrayBuffer()) += v
         }
+        CSPUpdateResult.consistent
 
       case NewInstance(dynType, instance, value) =>
         assert1(!dynType.isStatic)
@@ -52,8 +53,10 @@ final class TypesStore(_csp: CSP, base: Option[TypesStore] = None)
         dynamicToStatic(dynType) = dynamicToStatic(dynType).withInstance(instance, value)
         for (v <- varsByType.getOrElse(dynType, Nil))
           csp.updateDomain(v, v.domain + value)
+        CSPUpdateResult.consistent
 
       case _ =>
+        CSPUpdateResult.consistent
     }
   }
 

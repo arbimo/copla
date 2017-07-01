@@ -2,7 +2,7 @@ package copla.constraints.meta
 
 import copla.constraints.meta.variables.IntVariable
 import org.scalatest.{BeforeAndAfter, FunSuite}
-import copla.constraints.meta.search.BinarySearch
+import copla.constraints.meta.search.{BinarySearch, Solution}
 
 class DisjunctiveConstraintTest extends FunSuite with BeforeAndAfter {
 
@@ -20,8 +20,12 @@ class DisjunctiveConstraintTest extends FunSuite with BeforeAndAfter {
     csp.post(v2 =!= v1 || v2 =!= v3)
     csp.propagate()
     val res = BinarySearch.search(csp)
-    assert(res != null)
-    println(res.report)
-    assert(res.isSolution)
+    res match {
+      case Solution(sol) =>
+        println(sol.report)
+        assert(sol.isSolution)
+      case _ =>
+        assert(false)
+    }
   }
 }

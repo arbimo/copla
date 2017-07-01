@@ -1,6 +1,7 @@
 package copla.constraints.meta
 
-import copla.constraints.meta.constraints.{EqualityConstraint, InequalityConstraint}
+import copla.constraints.meta.constraints.{EqualityConstraint, InequalityConstraint, Satisfied, UpdateDomain}
+import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.events.NewConstraint
 import copla.constraints.meta.variables.IntVariable
 import org.scalatest.{BeforeAndAfter, FunSuite}
@@ -28,13 +29,10 @@ class ConstraintTest extends FunSuite with BeforeAndAfter {
     assert(c2.v2 == v2)
   }
 
-
   test("Constraint propagation difference") {
     val c = v1 =!= v2
-    c.propagate(NewConstraint(c))
-
-    assert(v1.domain.size == 2)
-    assert(!v1.domain.contains(2))
+    val res = c.propagate(NewConstraint(c))
+    assert(res == Satisfied(UpdateDomain(v1, Domain(1,3))))
   }
 
   test("Constraint propagation difference in CSP") {
@@ -47,10 +45,9 @@ class ConstraintTest extends FunSuite with BeforeAndAfter {
 
   test("Constraint propagation equality") {
     val c = v1 === v2
-    c.propagate(NewConstraint(c))
+    val res = c.propagate(NewConstraint(c))
 
-    assert(v1.domain.size == 1)
-    assert(v1.domain.contains(2))
+    assert(res == Satisfied(UpdateDomain(v1, Domain(2))))
   }
 
   test("Constraint propagation equality in CSP") {

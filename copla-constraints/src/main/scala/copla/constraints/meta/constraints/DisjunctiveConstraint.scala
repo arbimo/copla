@@ -1,10 +1,9 @@
 package copla.constraints.meta.constraints
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints.ConstraintSatisfaction._
 import copla.constraints.meta.domains.{Domain, SingletonDomain}
-import copla.constraints.meta.events.Event
-import copla.constraints.meta.events._
+import copla.constraints.meta.events.{DomainReduced, Event, WatchedSatisfied, WatchedViolated}
 import copla.constraints.meta.variables._
 
 class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
@@ -13,11 +12,11 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
     override def toString: String = s"disjunctive-dec-var[${DisjunctiveConstraint.this}]"
   }
 
-  override def variables(implicit csp: CSP): Set[IVar] = Set(decisionVar)
+  override def variables(implicit csp: CSPView): Set[IVar] = Set(decisionVar)
 
-  override def subconstraints(implicit csp: CSP) = disjuncts
+  override def subconstraints(implicit csp: CSPView) = disjuncts
 
-  override def satisfaction(implicit csp: CSP): Satisfaction = {
+  override def satisfaction(implicit csp: CSPView): Satisfaction = {
     val satisfactions = disjuncts.map(_.satisfaction)
     if (satisfactions.contains(SATISFIED))
       SATISFIED
@@ -27,32 +26,34 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
       VIOLATED
   }
 
-  override protected def _propagate(event: Event)(implicit csp: CSP) {
+  override def propagate(event: Event)(implicit csp: CSPView) = {
     event match {
       case WatchedSatisfied(c) =>
         assert(c.isSatisfied)
-        if (decisionVar.domain.contains(disjuncts.indexOf(c)))
-          csp.updateDomain(decisionVar, Domain(disjuncts.indexOf(c)))
+        assert(decisionVar.domain.contains(disjuncts.indexOf(c)),
+               "Decision var does not contain a satisfied constraint")
+        if (decisionVar.boundTo(disjuncts.indexOf(c)))
+          Satisfied()
         else
-          assert(
-            decisionVar.domain.nonEmpty,
-            "Decision variable has an empty domain even though one of the subconstraints is satisfired")
+          Satisfied(UpdateDomain(decisionVar, Domain(disjuncts.indexOf(c))))
       case WatchedViolated(c) =>
         assert(c.isViolated)
-        if (decisionVar.domain.contains(disjuncts.indexOf(c)))
-          csp.updateDomain(decisionVar, decisionVar.domain - disjuncts.indexOf(c))
+        if (decisionVar.boundTo(disjuncts.indexOf(c)))
+          Inconsistency
+        else if (decisionVar.domain.contains(disjuncts.indexOf(c))) {
+          Undefined(UpdateDomain(decisionVar, decisionVar.domain - disjuncts.indexOf(c)))
+        } else {
+          Undefined()
+        }
       case DomainReduced(`decisionVar`) =>
         if (decisionVar.isBound) {
           val selectedConstraint = disjuncts(decisionVar.value)
-          csp.postSubConstraint(selectedConstraint, this)
+          Undefined(Post(selectedConstraint))
+        } else {
+          Undefined()
         }
-      case NewConstraint(c) =>
-        for (c <- disjuncts) {
-          if (c.isSatisfied && decisionVar.domain.contains(disjuncts.indexOf(c)))
-            csp.updateDomain(decisionVar, Domain(disjuncts.indexOf(c)))
-          else if (c.isViolated && decisionVar.domain.contains(disjuncts.indexOf(c)))
-            csp.updateDomain(decisionVar, decisionVar.domain - disjuncts.indexOf(c))
-        }
+      case _ =>
+        Undefined()
     }
   }
 

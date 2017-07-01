@@ -1,7 +1,7 @@
 package copla.constraints.meta.constraints
 
 import copla.constraints.bindings.InconsistentBindingConstraintNetwork
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.events.Event
 import copla.constraints.meta.variables.{IVar, IntVariable, VariableSeq}
 
@@ -16,26 +16,29 @@ trait EqualityConstraint extends Constraint {
 class VariableEqualityConstraint(override val v1: IntVariable, override val v2: IntVariable)
     extends EqualityConstraint {
 
-  override def variables(implicit csp: CSP): Set[IVar] = Set(v1, v2)
+  override def variables(implicit csp: CSPView): Set[IVar] = Set(v1, v2)
 
-  override def _propagate(event: Event)(implicit csp: CSP): Unit = {
-    val d1 = csp.dom(v1)
-    val d2 = csp.dom(v2)
+  override def propagate(event: Event)(implicit view: CSPView) = {
+    val d1 = view.dom(v1)
+    val d2 = view.dom(v2)
 
-    if (d1.emptyIntersection(d2))
-      throw new InconsistentBindingConstraintNetwork()
-    else if (d1.isSingleton) {
-      csp.updateDomain(v2, d1)
+    if (d1.emptyIntersection(d2)) {
+      Inconsistency
+    } else if (d1.isSingleton) {
+      Satisfied(UpdateDomain(v2, d1))
     } else if (d2.isSingleton) {
-      csp.updateDomain(v1, d2)
+      Satisfied(UpdateDomain(v1, d2))
     } else {
       val inter = d1 intersection d2
-      csp.updateDomain(v1, inter)
-      csp.updateDomain(v2, inter)
+      if (inter.isSingleton) {
+        Satisfied(UpdateDomain(v1, inter), UpdateDomain(v2, inter))
+      } else {
+        Undefined(UpdateDomain(v1, inter), UpdateDomain(v2, inter))
+      }
     }
   }
 
-  override def satisfaction(implicit csp: CSP): Satisfaction = {
+  override def satisfaction(implicit csp: CSPView): Satisfaction = {
     val d1 = csp.dom(v1)
     val d2 = csp.dom(v2)
 

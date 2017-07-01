@@ -1,15 +1,15 @@
 package copla.constraints.meta.constraints
 
 import copla.constraints.bindings.InconsistentBindingConstraintNetwork
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.events.Event
 import copla.constraints.meta.variables.{IVar, IntVariable}
 
 class NegBindConstraint(val variable: IntVariable, val value: Int) extends Constraint {
 
-  override def variables(implicit csp: CSP): Set[IVar] = Set(variable)
+  override def variables(implicit csp: CSPView): Set[IVar] = Set(variable)
 
-  override def satisfaction(implicit csp: CSP): Satisfaction =
+  override def satisfaction(implicit csp: CSPView): Satisfaction =
     if (variable.domain.isSingleton && variable.domain.contains(value))
       ConstraintSatisfaction.VIOLATED
     else if (!variable.domain.contains(value))
@@ -17,13 +17,13 @@ class NegBindConstraint(val variable: IntVariable, val value: Int) extends Const
     else
       ConstraintSatisfaction.UNDEFINED
 
-  override protected def _propagate(event: Event)(implicit csp: CSP) {
-    if (variable.domain.contains(value)) {
-      if (variable.domain.size >= 2)
-        csp.updateDomain(variable, variable.domain - value)
-      else
-        throw new InconsistentBindingConstraintNetwork()
-    }
+  override def propagate(event: Event)(implicit csp: CSPView) = {
+    if (variable.boundTo(value))
+      Inconsistency
+    else if (variable.domain.contains(value))
+      Satisfied(UpdateDomain(variable, variable.domain - value))
+    else
+      Satisfied()
   }
 
   /** Returns the invert of this constraint (e.g. === for an =!= constraint) */

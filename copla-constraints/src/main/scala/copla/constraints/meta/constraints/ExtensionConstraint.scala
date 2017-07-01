@@ -1,7 +1,8 @@
 package copla.constraints.meta.constraints
 
 import copla.constraints.bindings.InconsistentBindingConstraintNetwork
-import copla.constraints.meta.CSP
+import copla.constraints.meta.constraints.ConstraintSatisfaction.{SATISFIED, UNDEFINED, VIOLATED}
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.domains.ExtensionDomain
 import copla.constraints.meta.events.Event
 import copla.constraints.meta.variables.{IVar, IntVariable}
@@ -10,9 +11,9 @@ import copla.constraints.meta.variables.{IVar, IntVariable}
 class ExtensionConstraint(_variables: Seq[IntVariable], extDomain: ExtensionDomain)
     extends Constraint {
 
-  override def variables(implicit csp: CSP): Set[IVar] = _variables.toSet
+  override def variables(implicit csp: CSPView): Set[IVar] = _variables.toSet
 
-  override def satisfaction(implicit csp: CSP): Satisfaction = {
+  override def satisfaction(implicit csp: CSPView): Satisfaction = {
     val domains = _variables.map(_.domain)
     if (domains.forall(_.isSingleton)) {
       val values = domains.map(_.values.head)
@@ -25,14 +26,23 @@ class ExtensionConstraint(_variables: Seq[IntVariable], extDomain: ExtensionDoma
     }
   }
 
-  override protected def _propagate(event: Event)(implicit csp: CSP): Unit = {
+  override def propagate(event: Event)(implicit csp: CSPView) = {
     val initialDomains    = _variables.map(_.domain)
     val restrictedDomains = extDomain.restrictedDomains(initialDomains)
-    for (i <- _variables.indices) {
-      if (restrictedDomains(i).isEmpty)
-        throw new InconsistentBindingConstraintNetwork()
-      else if (initialDomains(i).size > restrictedDomains(i).size)
-        csp.updateDomain(_variables(i), restrictedDomains(i))
+    if (restrictedDomains.exists(_.isEmpty)) {
+      Inconsistency
+    } else {
+      val changes =
+        for (i <- _variables.indices if initialDomains(i).size > restrictedDomains(i).size)
+          yield UpdateDomain(_variables(i), restrictedDomains(i))
+
+      // build a lookahead containing all changes to apply to determine whether the constraint will be satisfied
+      val lookahead = csp ++ changes
+      satisfaction(lookahead) match {
+        case SATISFIED => Satisfied(changes)
+        case UNDEFINED => Undefined(changes)
+        case VIOLATED  => Inconsistency
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 package copla.constraints.meta.variables
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints._
 import copla.constraints.meta.domains.Domain
 
@@ -33,11 +33,13 @@ trait IVar {
 
 /** Denotes a variable whose domain can be retrieved and represented explicitly */
 trait VarWithDomain extends IVar {
-  def domain(implicit csp: CSP): Domain
+  def domain(implicit csp: CSPView): Domain
 
-  def isBound(implicit csp: CSP) = domain.isSingleton
+  def isBound(implicit csp: CSPView) = domain.isSingleton
 
-  def value(implicit csp: CSP) = {
+  def boundTo(value: Int)(implicit csp: CSPView) = domain.isSingleton && domain.contains(value)
+
+  def value(implicit csp: CSPView) = {
     require(domain.isSingleton, "Can only request the value of a bound variable")
     domain.values.head
   }
@@ -53,9 +55,9 @@ trait VarWithDomain extends IVar {
 abstract class IntVariable(val ref: Option[Any]) extends VarWithDomain {
   private val id = IntVariable.next()
 
-  def initialDomain(implicit csp: CSP): Domain
+  def initialDomain(implicit csp: CSPView): Domain
 
-  def domain(implicit csp: CSP) = csp.dom(this)
+  def domain(implicit csp: CSPView) = csp.dom(this)
 
   /** By default, any IntVar is a decision variable */
   override def isDecisionVar: Boolean = true
@@ -72,7 +74,7 @@ abstract class IntVariable(val ref: Option[Any]) extends VarWithDomain {
 
 class IntVar(_initialDomain: Domain, ref: Option[Any] = None) extends IntVariable(ref) {
 
-  def initialDomain(implicit csp: CSP): Domain = _initialDomain
+  def initialDomain(implicit csp: CSPView): Domain = _initialDomain
 
 }
 

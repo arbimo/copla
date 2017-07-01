@@ -1,6 +1,6 @@
 package copla.constraints.meta.stn.variables
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints.Constraint
 import copla.constraints.meta.domains.IntervalDomain
 import copla.constraints.meta.stn.constraint.{AbsoluteAfterConstraint, AbsoluteBeforeConstraint}
@@ -9,7 +9,7 @@ import copla.constraints.meta.variables.{IVar, VarWithDomain}
 
 class Timepoint(val id: Int, ref: Option[Any]) extends VarWithDomain {
 
-  override def domain(implicit csp: CSP): IntervalDomain = csp.dom(this)
+  override def domain(implicit csp: CSPView): IntervalDomain = csp.dom(this)
 
   def isStructural: Boolean = false
   def isContingent: Boolean = false

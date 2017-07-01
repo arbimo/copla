@@ -4,6 +4,7 @@ import java.util
 
 import copla.constraints.bindings.InconsistentBindingConstraintNetwork
 import copla.constraints.meta.util.Assertion._
+import copla.constraints.stnu.InconsistentTemporalNetwork
 
 import scala.collection.mutable
 
@@ -108,7 +109,7 @@ class DistanceMatrix(
     */
   def enforceDist(a: Int, b: Int, d: Int): Unit = {
     if (plus(d, dists(b)(a)) < 0)
-      throw new InconsistentBindingConstraintNetwork()
+      throw new InconsistentTemporalNetwork()
     if (d >= dists(a)(b))
       return // constraint is dominated
 

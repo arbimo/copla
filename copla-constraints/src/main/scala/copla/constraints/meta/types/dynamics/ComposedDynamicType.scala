@@ -1,6 +1,6 @@
 package copla.constraints.meta.types.dynamics
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.types.statics.{ComposedType, Type}
 import copla.constraints.meta.types.statics.Type
 
@@ -12,6 +12,6 @@ class ComposedDynamicType[T](val directSubTypes: Seq[DynamicType[T]]) extends Dy
   override lazy val defaultStatic: Type[T] =
     new ComposedType[T](directSubTypes.map(_.defaultStatic))
 
-  override def static(implicit csp: CSP): Type[T] =
+  override def static(implicit csp: CSPView): Type[T] =
     new ComposedType[T](directSubTypes.map(_.static))
 }

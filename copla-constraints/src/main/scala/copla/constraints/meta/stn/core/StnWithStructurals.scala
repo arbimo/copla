@@ -1,5 +1,6 @@
 package copla.constraints.meta.stn.core
 
+import copla.constraints.meta.CSPUpdateResult
 import copla.constraints.meta.stn.constraint.{
   AbsoluteAfterConstraint,
   AbsoluteBeforeConstraint,
@@ -13,6 +14,7 @@ import copla.constraints.stnu.{Controllability, InconsistentTemporalNetwork}
 import copla.constraints.stnu.{Controllability, InconsistentTemporalNetwork, STNU}
 
 import scala.collection.mutable
+import scala.util.{Failure, Success, Try}
 
 object StnWithStructurals {
   var debugging = false
@@ -190,22 +192,31 @@ class StnWithStructurals(
                      DistanceMatrix.plus(DistanceMatrix.plus(aToRef, t), refToB))
   }
 
-  def addConstraint(c: TemporalConstraint): Unit = {
-    c match {
-      case req: MinDelay =>
-        addMinDelay(req.src, req.dst, req.minDelay)
-      case cont: Contingent =>
-        addMinDelay(cont.src, cont.dst, cont.min)
-        addMaxDelay(cont.src, cont.dst, cont.max)
-        contingentLinks.append(cont)
-      case abs: AbsoluteBeforeConstraint =>
-        assert1(start.nonEmpty, "Absolute constraints require a start timepoint")
-        addMaxDelay(start.get, abs.tp, abs.deadline)
-      case abs: AbsoluteAfterConstraint =>
-        assert1(start.nonEmpty, "Absolute constraints require a start timepoint")
-        addMinDelay(start.get, abs.tp, abs.deadline)
-      case _ =>
-        throw new RuntimeException("Constraint: " + c + " is not properly supported")
+  def addConstraint(c: TemporalConstraint): CSPUpdateResult = {
+    Try {
+      c match {
+        case req: MinDelay =>
+          addMinDelay(req.src, req.dst, req.minDelay)
+        case cont: Contingent =>
+          addMinDelay(cont.src, cont.dst, cont.min)
+          addMaxDelay(cont.src, cont.dst, cont.max)
+          contingentLinks.append(cont)
+        case abs: AbsoluteBeforeConstraint =>
+          assert1(start.nonEmpty, "Absolute constraints require a start timepoint")
+          addMaxDelay(start.get, abs.tp, abs.deadline)
+        case abs: AbsoluteAfterConstraint =>
+          assert1(start.nonEmpty, "Absolute constraints require a start timepoint")
+          addMinDelay(start.get, abs.tp, abs.deadline)
+        case _ =>
+          throw new RuntimeException("Constraint: " + c + " is not properly supported")
+      }
+    } match {
+      case Success(_) =>
+        CSPUpdateResult.consistent
+      case Failure(_: InconsistentTemporalNetwork) =>
+        CSPUpdateResult.inconsistent(s"Temporal insconsistency from: $c")
+      case Failure(unexpected) =>
+        CSPUpdateResult.fatal(unexpected)
     }
   }
 

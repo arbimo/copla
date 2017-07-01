@@ -2,7 +2,7 @@ package copla.constraints.meta.stn.variables
 
 import java.util.Objects
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints.Constraint
 import copla.constraints.meta.domains.IntervalDomain
 import copla.constraints.meta.stn.constraint.MinDelay
@@ -10,7 +10,7 @@ import copla.constraints.meta.variables.{IVar, VarWithDomain}
 
 class TemporalDelay(val from: Timepoint, val to: Timepoint) extends VarWithDomain {
 
-  override def domain(implicit csp: CSP): IntervalDomain = csp.dom(this)
+  override def domain(implicit csp: CSPView): IntervalDomain = csp.dom(this)
 
   def <=(value: Int) = new MinDelay(from, to, value)
   def <(value: Int)  = this <= value + 1

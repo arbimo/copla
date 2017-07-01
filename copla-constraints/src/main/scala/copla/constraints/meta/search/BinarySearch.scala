@@ -1,19 +1,36 @@
 package copla.constraints.meta.search
 
-import copla.constraints.bindings.InconsistentBindingConstraintNetwork
-import copla.constraints.meta.CSP
+import copla.constraints.meta._
+import copla.constraints.meta.util.Assertion._
+
+sealed trait SearchResult {
+  def isSolution: Boolean
+}
+
+case class Solution(csp: CSP) extends SearchResult {
+  assert3(csp.isSolution)
+  override def isSolution = true
+}
+
+case class Failure(cause: Option[Inconsistent]) extends SearchResult {
+  override def isSolution = false
+}
+
+case class Crash(cause: FatalError) extends SearchResult {
+  override def isSolution = false
+}
 
 object BinarySearch {
   var count = 0
 
-  def search(_csp: CSP, optimizeMakespan: Boolean = false): CSP = {
+  def search(_csp: CSP, optimizeMakespan: Boolean = false): SearchResult = {
     count += 1
     implicit val csp = _csp
-    try {
-      csp.propagate()
-    } catch {
-      case e: InconsistentBindingConstraintNetwork =>
-        return null
+
+    csp.propagate() match {
+      case Consistent      => // continue
+      case x: Inconsistent => return Failure(Some(x))
+      case x: FatalError   => return Crash(x)
     }
 
     // variables by increasing domain size
@@ -24,25 +41,30 @@ object BinarySearch {
     // no decision left, success!
     if (decisions.isEmpty) {
       println(s"Got solution of makespan: " + csp.makespan)
-      return csp
+      return Solution(csp)
     }
 
     val decision = decisions.head
 
-    val base: CSP = csp.clone
-    var res: CSP  = null
+    val base: CSP                 = csp.clone
+    var res: Option[SearchResult] = None
 
     for (opt <- decision.options) {
       val cloned = base.clone
       opt.enforceIn(cloned)
-      val tmp = search(cloned, optimizeMakespan)
-      if (tmp != null && !optimizeMakespan) {
-        return tmp
-      } else if (tmp != null) {
-        res = tmp
-        base.post(base.temporalHorizon < res.makespan)
+      search(cloned, optimizeMakespan) match {
+        case Solution(sol) if !optimizeMakespan =>
+          return Solution(sol)
+        case Solution(sol) =>
+          // enforce better makespan for future branches
+          base.post(base.temporalHorizon < sol.makespan)
+          res = Some(Solution(sol))
+        case x: Failure =>
+          res = res.orElse(Some(x))
+        case x: Crash =>
+          return x
       }
     }
-    return res
+    res.getOrElse(Failure(None))
   }
 }
