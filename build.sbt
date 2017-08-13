@@ -1,9 +1,9 @@
 name := "copla-build"
 
 // global settings
-val _organization = "fr.bitmonnot.copla"
+val _organization = "com.github.arthur-bit-monnot"
 val _version = "0.1-SNAPSHOT"
-val _scalaVersion = "2.12.2"
+val _scalaVersion = "2.11.11"  // used for compatibility with scala native
 
 lazy val root = project.in(file(".")).
   aggregate(coplaLang, coplaConstraints).
@@ -36,7 +36,7 @@ lazy val coplaLang = project.in(file("copla-lang"))
   .settings(name := "copla-lang")
   .settings(commonSettings: _*)
   .settings(libraryDependencies ++= Seq(
-    "com.lihaoyi" %% "fastparse" % "0.4.3",
+    "com.lihaoyi" %% "fastparse" % "0.4.4",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test"
   ))
 
