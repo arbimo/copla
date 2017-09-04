@@ -1,48 +1,49 @@
 name := "copla-build"
 
 // global settings
-val _organization = "com.github.arthur-bit-monnot"
-val _version = "0.1-SNAPSHOT"
-val _scalaVersion = "2.11.11"  // used for compatibility with scala native
+lazy val commonSettings = Seq(
+  organization := "com.github.arthur-bit-monnot",
+  version := "0.1-SNAPSHOT",
+  crossPaths := true
+)
+
+lazy val commonJVMSettings = Seq(
+  scalaVersion := "2.12.3",
+  exportJars := true, // insert other project dependencies in oneJar
+  javaOptions in run ++= Seq("-Xmx1000m", "-ea"),
+  libraryDependencies += "org.scalatest" %%% "scalatest" % "3.0.1" % "test"
+)
+
+lazy val commonNativeSettings = Seq(
+  scalaVersion := "2.11.11"
+)
 
 lazy val root = project.in(file(".")).
-  aggregate(coplaLang, coplaConstraints).
+  aggregate(coplaLangJVM, coplaConstraints).
   settings(
     publish := {},
     publishLocal := {}
   )
 
-version := _version
-scalaVersion := _scalaVersion
-organization := _organization
-crossPaths := true
 
-initialize := {
-  val _ = initialize.value
-  if (sys.props("java.specification.version") != "1.8")
-    sys.error("Java 8 is required for this project.")
-}
-
-lazy val commonSettings = Seq(
-  organization := _organization,
-  version := _version,
-  crossPaths := true,
-  exportJars := true, // insert other project dependencies in oneJar
-  scalaVersion := _scalaVersion,
-  javaOptions in run ++= Seq("-Xmx1000m", "-ea")
-)
-
-lazy val coplaLang = project.in(file("copla-lang"))
+lazy val coplaLang = crossProject(JVMPlatform, NativePlatform)
+  .crossType(CrossType.Pure) // keep usual repository organization
+  .in(file("copla-lang"))
   .settings(name := "copla-lang")
   .settings(commonSettings: _*)
+  .jvmSettings(commonJVMSettings: _*)
+  .nativeSettings(commonNativeSettings: _*)
   .settings(libraryDependencies ++= Seq(
-    "com.lihaoyi" %% "fastparse" % "0.4.4",
-    "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+    "com.lihaoyi" %%% "fastparse" % "0.4.4"
   ))
+
+lazy val coplaLangJVM = coplaLang.jvm
+lazy val coplaLangNative = coplaLang.native
 
 lazy val coplaConstraints = project.in(file("copla-constraints"))
   .settings(name := "copla-constraints")
   .settings(commonSettings: _*)
+  .settings(commonJVMSettings: _*)
   .settings(libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.1" % "test"
   ))
