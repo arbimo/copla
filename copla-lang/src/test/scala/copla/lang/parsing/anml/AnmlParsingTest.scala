@@ -36,7 +36,16 @@ class AnmlParsingTest extends FunSuite {
     "fluent boolean f(boolean x); constant boolean g(boolean arg); constant boolean h; [start,end] f(true) == g(h);",
     "fluent boolean f(boolean x); constant boolean g(boolean arg); constant boolean h(boolean arg); [start,end] f(g(true)) == g(h(true));",
     "constant boolean x(boolean arg); constant boolean y; ",
-    "constant boolean f(boolean x); fluent boolean g(boolean x); [start,end] g(true) == f(false);"
+    "constant boolean f(boolean x); fluent boolean g(boolean x); [start,end] g(true) == f(false);",
+    " ",
+    " type A;",
+    " // coucoudqsdsq\n       type A; ",
+    "// comment;:/34,  \n type A;",
+    "// comment  /* ",
+    "/***/",
+    "/* qdqs;3 */",
+    "type /*  //  */ A //\n;",
+    "/***/type /*  //  */ A // //\n ; "
   )
 
   def invalid = Seq(

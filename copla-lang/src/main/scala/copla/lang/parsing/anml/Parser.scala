@@ -337,7 +337,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
   }
 
   private[this] def anmlParser: Parser[Model] =
-    End ~ PassWith(currentModel) |
+    Pass ~ End ~ PassWith(currentModel) |
       (Pass ~ elem ~ Pass).flatMap(elem =>
         currentModel ++ elem match {
           case Some(extended) =>
@@ -366,7 +366,7 @@ class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
   }
 
   private[this] def parser: Parser[Model] =
-    End ~ PassWith(currentModel) |
+    Pass ~ End ~ PassWith(currentModel) |
       (Pass ~ nonTypeToken ~/ Pass).flatMap(_ => parser) |
       (Pass ~ typeDeclaration ~ Pass).flatMap(typeDecl =>
         currentModel + typeDecl match {

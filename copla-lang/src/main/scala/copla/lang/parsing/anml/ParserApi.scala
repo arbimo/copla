@@ -5,7 +5,10 @@ object ParserApi {
   val baseApi = fastparse.noApi
   val whiteApi = fastparse.WhitespaceApi.Wrapper {
     import fastparse.all._
-    val white = CharsWhileIn(" \r\n\t")
+    val inlineComment = "//" ~ CharsWhile(c => c != '\n', min = 0) ~ ("\n" | PassWith("")~ &(End))
+    val multiLineComment = "/*" ~ (AnyChar ~ !"*/").rep ~ AnyChar ~ "*/"
+
+    val white = (" " | "\r" | "\n" | "\t" | inlineComment | multiLineComment).map(_ => {})
     NoTrace(white.rep)
   }
 
