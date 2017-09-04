@@ -7,6 +7,7 @@ class AnmlParsingTest extends FunSuite {
 
   def valid = Seq(
     "type a;",
+    "type Axy_13_zr;",
     " type a ; ",
     "type b2;",
     "type a; type b < a;",
@@ -50,6 +51,7 @@ class AnmlParsingTest extends FunSuite {
 
   def invalid = Seq(
     "type 2b;",
+    "type A-B;",
     "type type;",
     "type a < a;",
     "type a; type a;",

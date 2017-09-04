@@ -20,8 +20,8 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
   val word: Parser[String] = {
     import fastparse.all._ // override sequence composition to ignore white spaces
-    (CharIn(('a' to 'z') ++ ('A' to 'Z')) ~
-      CharsWhileIn(('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9'), min = 0)).!.opaque("word")
+    (CharIn(('a' to 'z') ++ ('A' to 'Z') ++ "_") ~
+      CharsWhileIn(('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') ++ "_", min = 0)).!.opaque("word")
   }
   val int: Parser[Int] = CharsWhileIn('0' to '9').!.map(_.toInt).opaque("int")
 
