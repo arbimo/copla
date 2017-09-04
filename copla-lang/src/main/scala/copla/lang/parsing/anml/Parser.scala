@@ -32,7 +32,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
   val constantKW        = word.filter(_ == "constant").silent.opaque("constant")
   val timepointKW       = word.filter(_ == "timepoint").silent.opaque("instance")
   val durationKW        = word.filter(_ == "duration").silent.opaque("duration")
-  val keywords          = Set("type", "instance", "action", "duration", "fluent", "predicate", "timepoint")
+  val keywords          = Set("type", "instance", "action", "duration", "fluent", "variable", "predicate", "timepoint")
   val reservedTypeNames = Set()
   val nonIdent          = keywords ++ reservedTypeNames
 
@@ -280,8 +280,19 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
       PassWith(Seq()).opaque("no-args") // no args no, parenthesis
   }
 
+  /** Parser that to read the kind and type of a function declaration. For instance:
+    * "fluent T", "constant T", "function T", "variable T", "predicate" where T is a type already declared.
+    * Returns either ("fluent", T) or ("constant", T) considering that
+    * 1) "variable" and "function" are alias for "fluent"
+    * 2) "predicate" is an alias for "fluent boolean" */
+  val functionKindAndType: Parser[(String, Type)] = {
+    (word.filter(w => w == "fluent" || w == "variable" || w == "function").opaque("fluent").silent ~/ declaredType).map(("fluent", _)) |
+      (constantKW ~/ declaredType).map(("constant", _)) |
+      word.filter(_ == "predicate").opaque("predicate").optGet(_ => ctx.findType("boolean")).map(("fluent", _))
+  }
+
   val functionDeclaration: Parser[FunctionDeclaration] = {
-    ((fluentKW | constantKW).! ~/ declaredType ~ freeIdent ~ argList ~ ";")
+    (functionKindAndType ~ freeIdent ~ argList ~ ";")
       .map {
         case ("fluent", typ, svName, args) =>
           FluentTemplate(ctx.id(svName), typ, args.map {
