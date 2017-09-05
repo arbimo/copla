@@ -43,9 +43,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
   val freeIdent =
     simpleIdent
-      .namedFilter(
-        name => ctx.elems.collect { case d: Declaration[_] => d }.forall(name != _.id.name),
-        "unused")
+      .namedFilter(id => ctx.findDeclaration(id) match { case Some(_) => false case None => true }, "unused")
 
   val declaredType: Parser[Type] =
     typeName.optGet(ctx.findType(_), "declared")
@@ -70,7 +68,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
         i => // integer as a tp defined relatively to the global start, if one exists
           ctx.root.findTimepoint("start") match {
             case Some(st) => PassWith(st + i)
-            case None     => Fail.opaque("fail:no start timepoint in top level scope")
+            case None     => Fail.opaque("fail: no start timepoint in top level scope")
         })
   }.opaque("timepoint")
 
@@ -285,7 +283,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
     * Returns either ("fluent", T) or ("constant", T) considering that
     * 1) "variable" and "function" are alias for "fluent"
     * 2) "predicate" is an alias for "fluent boolean" */
-  val functionKindAndType: Parser[(String, Type)] = {
+  private[this] val functionKindAndType: Parser[(String, Type)] = {
     (word.filter(w => w == "fluent" || w == "variable" || w == "function").opaque("fluent").silent ~/ declaredType).map(("fluent", _)) |
       (constantKW ~/ declaredType).map(("constant", _)) |
       word.filter(_ == "predicate").opaque("predicate").optGet(_ => ctx.findType("boolean")).map(("fluent", _))

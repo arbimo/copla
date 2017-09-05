@@ -47,7 +47,9 @@ class AnmlParsingTest extends FunSuite {
     "/***/",
     "/* qdqs;3 */",
     "type /*  //  */ A //\n;",
-    "/***/type /*  //  */ A // //\n ; "
+    "/***/type /*  //  */ A // //\n ; ",
+    "type A with { fluent boolean x; }; type B with { fluent boolean y; };",
+    "type A with { fluent boolean x; }; type B with { fluent boolean x; };"
   )
 
   def invalid = Seq(
@@ -101,8 +103,8 @@ class AnmlParsingTest extends FunSuite {
     }
   }
 
-  val tmp =
-    "type A; type B; fluent A f(B b); instance A a1; instance B b1; [start,end] f(b1) == a1;"
+  val tmp = "type A with { fluent boolean x; }; type B with { fluent boolean x; };"
+
   test("debug: temporary") {
 
     /** Dummy text to facilitate testing. */
