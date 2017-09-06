@@ -431,7 +431,8 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
         .sideEffect(argDeclarations => updateContext(currentAction ++ argDeclarations)) ~
       "{" ~/
       (temporalConstraint |
-        temporallyQualifiedAssertion.map(Seq(_)))
+        temporallyQualifiedAssertion.map(Seq(_)) |
+        staticAssertion.map(Seq(_)))
         .sideEffect(x => updateContext(currentAction ++ x)) // add assertions to the current action
         .rep ~
       "}" ~/
