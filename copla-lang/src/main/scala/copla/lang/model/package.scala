@@ -50,6 +50,14 @@ package object model {
     override def toString = s"$interval $assertion"
   }
 
+  trait StaticAssertion extends ModuleElem with ActionElem
+  case class StaticEqualAssertion(left: StaticSymExpr, right: StaticSymExpr) extends StaticAssertion {
+    override def toString: String = s"$left == $right"
+  }
+  case class StaticDifferentAssertion(left: StaticSymExpr, right: StaticSymExpr) extends StaticAssertion {
+    override def toString: String = s"$left != $right"
+  }
+
   trait Declaration[T] {
     def id: Id
   }

@@ -263,6 +263,23 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .map { case (it, assertion) => TemporallyQualifiedAssertion(it, assertion) }
   }
 
+  val staticAssertion: Parser[StaticAssertion] =
+    (staticSymExpr ~/
+      (("==" | "!=").! ~/ staticSymExpr).? ~
+      ";")
+      .namedFilter({
+        case (_, Some(_)) => true
+        case (expr, None) => expr.typ.id.name == "boolean"
+      }, "boolean-if-no-right-side")
+      .namedFilter({
+        case (left, Some((_, right))) => left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
+        case (_, None) => true // already checked that it is a boolean
+      }, "equality-between-compatible-types")
+      .map {
+        case (left, Some(("==", right))) => StaticEqualAssertion(left, right)
+        case (left, Some(("!=", right))) => StaticDifferentAssertion(left, right)
+        case (expr, None) => StaticEqualAssertion(expr, ctx.findVariable("true").get)
+      }
 }
 
 /** Second phase parser that extracts all ANML elements expects types that should
@@ -355,6 +372,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
       timepointDeclaration.map(Seq(_)) |
       temporalConstraint |
       temporallyQualifiedAssertion.map(Seq(_)) |
+      staticAssertion.map(Seq(_)) |
       action.map(Seq(_))
 
   def currentModel: Model = ctx match {
@@ -425,7 +443,7 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
 class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
 
   val nonTypeToken =
-    (word | int | CharIn("{}[]();=:<>-+.,")).!.namedFilter(_ != "type", "non-type-token")
+    (word | int | CharIn("{}[]();=:<>-+.,!/*")).!.namedFilter(_ != "type", "non-type-token")
   val typeDeclaration = (typeKW ~/ freeIdent ~ ("<" ~ declaredType).? ~ (";" | withKW)).map {
     case (name, parentOpt) => TypeDeclaration(Type(ctx.id(name), parentOpt))
   }
