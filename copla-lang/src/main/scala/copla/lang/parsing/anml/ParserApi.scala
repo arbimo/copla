@@ -53,6 +53,12 @@ object ParserApi {
       /** Make the parser silent. */
       def silent: Parser[Unit] = parser.map(_ => {})
     }
+
+    implicit class ParserWithSideEffect[T](parser: Parser[T]) {
+
+      /** Keeps the parsed value unchanged but applies a side effect procedure. */
+      def sideEffect(proc: T => Unit): Parser[T] = parser.map(x => { proc(x); x })
+    }
   }
 
 }

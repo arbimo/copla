@@ -31,6 +31,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
   val fluentKW    = word.filter(_ == "fluent").silent.opaque("fluent")
   val constantKW  = word.filter(_ == "constant").silent.opaque("constant")
   val timepointKW = word.filter(_ == "timepoint").silent.opaque("instance")
+  val actionKW    = word.filter(_ == "action").silent.opaque("action")
   val durationKW  = word.filter(_ == "duration").silent.opaque("duration")
   val keywords =
     Set("type", "instance", "action", "duration", "fluent", "variable", "predicate", "timepoint")
@@ -169,6 +170,27 @@ abstract class AnmlParser(val initialContext: Ctx) {
     }
   }
 
+  /** Parses a sequence of args necessarily enclosed in parenthesis if non empty
+    * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
+    */
+  protected val argList: Parser[Seq[(String, Type)]] = {
+    val arg: Parser[(String, Type)] =
+      (declaredType ~ ident)
+        .map { case (typ, argName) => (argName, typ) }
+
+    /** A list of at least one argument formatted as "Type1 arg, Type2 arg2" */
+    def distinctArgSeq(sep: String,
+                       previous: Seq[(String, Type)] = Seq()): Parser[Seq[(String, Type)]] =
+      Pass ~ arg
+        .namedFilter(a => !previous.exists(_._1 == a._1), "not-used-in-current-arg-sequence")
+        .flatMap(a => (Pass ~ sep ~/ distinctArgSeq(sep, previous :+ a)) | PassWith(previous :+ a))
+
+    ("(" ~/
+      ((&(word) ~/ distinctArgSeq(",")) | PassWith(Seq()).opaque("no-args")) ~
+      ")") | // parenthesis with and without args
+      PassWith(Seq()).opaque("no-args") // no args no, parenthesis
+  }
+
   val timedSymExpr: Parser[TimedSymExpr] = {
     val partiallyAppliedFluent = partiallyAppliedFunction
       .namedFilter(_._1.isInstanceOf[FluentTemplate], "is-fluent")
@@ -263,27 +285,6 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
       .map { case (typ, instanceNames) => instanceNames.map(name => Instance(ctx.id(name), typ)) }
   }.map(instances => instances.map(InstanceDeclaration(_)))
 
-  /** Parses a sequence of args necessarily enclosed in parenthesis if non empty
-    * Example of valid inputs "", "()", "(Type1 arg1)", "(Type1 arg1, Type2 arg2)"
-    */
-  private[this] val argList: Parser[Seq[(String, Type)]] = {
-    val arg: Parser[(String, Type)] =
-      (declaredType ~ ident)
-        .map { case (typ, argName) => (argName, typ) }
-
-    /** A list of at least one argument formatted as "Type1 arg, Type2 arg2" */
-    def distinctArgSeq(sep: String,
-                       previous: Seq[(String, Type)] = Seq()): Parser[Seq[(String, Type)]] =
-      Pass ~ arg
-        .namedFilter(a => !previous.exists(_._1 == a._1), "not-used-in-current-arg-sequence")
-        .flatMap(a => (Pass ~ sep ~/ distinctArgSeq(sep, previous :+ a)) | PassWith(previous :+ a))
-
-    ("(" ~/
-      ((&(word) ~/ distinctArgSeq(",")) | PassWith(Seq()).opaque("no-args")) ~
-      ")") | // parenthesis with and without args
-      PassWith(Seq()).opaque("no-args") // no args no, parenthesis
-  }
-
   /** Parser that to read the kind and type of a function declaration. For instance:
     * "fluent T", "constant T", "function T", "variable T", "predicate" where T is a type already declared.
     * Returns either ("fluent", T) or ("constant", T) considering that
@@ -345,17 +346,20 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
           })
       }
 
+  val action: Parser[ActionTemplate] = new AnmlActionParser(this).parser
+
   val elem: Parser[Seq[ModuleElem]] =
     inTypeFunctionDeclaration |
       instancesDeclaration |
       functionDeclaration.map(Seq(_)) |
       timepointDeclaration.map(Seq(_)) |
       temporalConstraint |
-      temporallyQualifiedAssertion.map(Seq(_))
+      temporallyQualifiedAssertion.map(Seq(_)) |
+      action.map(Seq(_))
 
-  private[this] def currentModel: Model = ctx match {
+  def currentModel: Model = ctx match {
     case m: Model => m
-    case x        => sys.error("Current context is not a model")
+    case _        => sys.error("Current context is not a model")
   }
 
   private[this] def anmlParser: Parser[Model] =
@@ -372,6 +376,49 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
     updateContext(initialModel)
     anmlParser.parse(input)
   }
+}
+
+class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superParser.currentModel) {
+
+  private def currentAction: ActionTemplate = ctx match {
+    case a: ActionTemplate => a
+    case _      => sys.error("Current context is not an action.")
+  }
+
+  /** Creates an action template with the given name and its default content (i.e. start/end timepoints). */
+  private[this] def buildEmptyAction(actionName: String): ActionTemplate = {
+    val container = ctx match {
+      case m: Model => m
+      case _        => sys.error("Starting to parse an action while the context is not a model.")
+    }
+    val emptyAct = new ActionTemplate(actionName, container, Nil)
+    emptyAct +
+      TimepointDeclaration(TPRef(Id(emptyAct.scope, "start"))) +
+      TimepointDeclaration(TPRef(Id(emptyAct.scope, "end")))
+  }
+
+  val parser: Parser[ActionTemplate] =
+    (Pass ~ actionKW.sideEffect(x => {
+      // set context to the current model in order to access previous declarations
+      updateContext(superParser.currentModel)
+    }) ~/
+      freeIdent.sideEffect(actionName => {
+        // set context to the current action
+        updateContext(buildEmptyAction(actionName))
+      }) ~/
+      argList // parse arguments and update the current action
+        .map(_.map {
+          case (name, typ) => ArgDeclaration(Arg(Id(ctx.scope, name), typ))
+        })
+        .sideEffect(argDeclarations => updateContext(currentAction ++ argDeclarations)) ~
+      "{" ~/
+      (temporalConstraint |
+        temporallyQualifiedAssertion.map(Seq(_)))
+        .sideEffect(x => updateContext(currentAction ++ x)) // add assertions to the current action
+        .rep ~
+      "}" ~/
+      ";")
+      .flatMap(_ => PassWith(currentAction))
 }
 
 /** First phase parser used to extract all type declarations from a given ANML string. */

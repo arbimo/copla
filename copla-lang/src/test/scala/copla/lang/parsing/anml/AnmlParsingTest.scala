@@ -49,7 +49,13 @@ class AnmlParsingTest extends FunSuite {
     "type /*  //  */ A //\n;",
     "/***/type /*  //  */ A // //\n ; ",
     "type A with { fluent boolean x; }; type B with { fluent boolean y; };",
-    "type A with { fluent boolean x; }; type B with { fluent boolean x; };"
+    "type A with { fluent boolean x; }; type B with { fluent boolean x; };",
+    "action A { };",
+    "action A (boolean x, boolean y) {};",
+    "type T; action A(T t) {};",
+    "action A { duration == 10; };",
+    "fluent boolean sv; action A { [start,end] sv == true; };",
+    "type T; fluent boolean sv(T t); action A(T t) { [start,end] sv(t) == false; };"
   )
 
   def invalid = Seq(
@@ -77,7 +83,9 @@ class AnmlParsingTest extends FunSuite {
     "type A; type B; fluent A f(B b); instance A a1; instance B b1; [start,end] id: f(b1) == a2;",
     "fluent boolean f; [10,10] id: f == true; id.xxxx < 10;",
     "type A with { fluent boolean f(B x); };",
-    "type A with { fluent boolean f(boolean x); }; instance A a; [start,end] A.f(true) == false;"
+    "type A with { fluent boolean f(boolean x); }; instance A a; [start,end] A.f(true) == false;",
+    "action A(T t) {};",
+    "action A(boolean x, boolean x) {};"
   )
 
   for (anml <- valid) {

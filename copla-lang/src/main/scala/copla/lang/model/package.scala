@@ -13,7 +13,8 @@ package object model {
 
   trait Elem
   trait ModuleElem extends Elem
-  trait Statement  extends ModuleElem
+  trait ActionElem extends Elem
+  trait Statement  extends ModuleElem with ActionElem
 
   /** An elem wrapping otehr elems pertaining to the same scope. */
   trait Wrapper extends Elem {
@@ -42,6 +43,7 @@ package object model {
   }
   case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion)
       extends ModuleElem
+      with ActionElem
       with Wrapper {
 
     override def wrapped  = Seq(assertion)
@@ -152,7 +154,7 @@ package object model {
   case class Arg(id: Id, typ: Type) extends Var {
     override def toString = s"${typ.id} $id"
   }
-  case class ArgDeclaration(arg: Arg) extends VarDeclaration[Arg] {
+  case class ArgDeclaration(arg: Arg) extends VarDeclaration[Arg] with ActionElem {
     override def variable = arg
     override def toString = arg.toString
   }
@@ -189,7 +191,7 @@ package object model {
 
     def -(other: TPRef) = Delay(other, this)
   }
-  case class TimepointDeclaration(tp: TPRef) extends Declaration[TPRef] with ModuleElem {
+  case class TimepointDeclaration(tp: TPRef) extends Declaration[TPRef] with ModuleElem with ActionElem {
     require(tp.delay == 0, "Cannot declare a relative timepoint.")
     override def id       = tp.id
     override def toString = s"timepoint $id"
@@ -215,6 +217,23 @@ package object model {
     def toInScopeString(name: String) = (path :+ name).mkString(".")
   }
 
+  class ActionTemplate(override val name: String, val containingModel: Model, val elems: Seq[ActionElem])
+    extends Ctx
+      with ModuleElem {
+    override def parent: Option[Ctx] = Some(containingModel)
+
+    def +(elem: ActionElem): ActionTemplate = new ActionTemplate(name, containingModel, elems :+ elem)
+    def ++(newElems: Seq[ActionElem]): ActionTemplate = newElems.headOption match {
+      case Some(first) => (this + first) ++ newElems.tail
+      case None        => this
+    }
+
+    override def toString: String =
+      s"action $name(${elems.collect { case ArgDeclaration(Arg(id, typ)) => s"$typ ${id.name}" }.mkString(", ")}) {\n" +
+        elems.map("    " + _.toString).mkString("\n") +
+        "  };"
+  }
+
   trait Ctx {
     val elems: Seq[Elem]
     def parent: Option[Ctx]
@@ -234,9 +253,7 @@ package object model {
 
     private[this] lazy val declarations: Map[Id, Declaration[_]] =
       allElems.collect {
-        case x: Declaration[_] => {
-          (x.id, x)
-        }
+        case x: Declaration[_] => (x.id, x)
       }.toMap
 
     private[this] lazy val subContexts: Map[String, Ctx] =
@@ -257,10 +274,10 @@ package object model {
               subContexts.get(subScopeName).flatMap(_.findDeclaration(name))
             )
         case Nil =>
-          sys.error("Invalid name: " + name)
+          sys.error("Invalid name: " + localID)
         case _ =>
-          sys.error(s"No support for multiple nested declarations: $name")
-      }).orElse(parent.flatMap(_.findDeclaration(name)))
+          sys.error(s"No support for multiple nested declarations: $localID")
+      }).orElse(parent.flatMap(_.findDeclaration(localID)))
     }
 
     def findVariable(name: String): Option[Var] =
