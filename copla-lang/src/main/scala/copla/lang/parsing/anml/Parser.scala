@@ -407,15 +407,9 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
     case _        => sys.error("Current context is not a model")
   }
 
-  private[this] def anmlParser: Parser[Model] =
-    Pass ~/ (End ~ PassWith(currentModel) |
-      (elem ~ Pass).flatMap(elem =>
-        currentModel ++ elem match {
-          case Some(extended) =>
-            updateContext(extended) // change state
-            anmlParser
-          case None => Fail.opaque("fail: parsed elem does not fit into the previous model")
-      }))
+  private[this] val anmlParser: Parser[Model] =
+    // for each elem parsed, update the current model
+    (Pass ~ elem.optGet(currentModel ++ _).sideEffect(updateContext(_)).silent).rep ~ End.map(_ => currentModel)
 
   def parse(input: String) = {
     updateContext(initialModel)
@@ -481,17 +475,10 @@ class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
     case x        => sys.error("Current context is not a model")
   }
 
-  private[this] def parser: Parser[Model] =
-    Pass ~/ (End ~ PassWith(currentModel) |
-      (nonTypeToken ~/ Pass).flatMap(_ => parser) |
-      (typeDeclaration ~ Pass).flatMap(typeDecl =>
-        currentModel + typeDecl match {
-          case Some(extendedModel) =>
-            updateContext(extendedModel)
-            parser
-          case None => Fail
-      }))
-
+  private[this] val parser: Parser[Model] = {
+    val typeDeclarationWithUpdate = typeDeclaration.optGet(currentModel + _).sideEffect(updateContext(_))
+    ((Pass ~ (nonTypeToken | typeDeclarationWithUpdate).silent).rep ~ End).map(_ => currentModel)
+  }
   def parse(input: String) = {
     updateContext(initialModel)
     parser.parse(input)
