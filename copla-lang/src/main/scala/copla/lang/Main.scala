@@ -22,15 +22,44 @@ object Main extends App {
   }
 
   optionsParser.parse(args, Config()) match {
-    case Some(conf) =>
-      Parser.parseFromFile(conf.anmlFile) match {
-        case ParseSuccess(module) =>
-          if (!conf.quiet)
-            println(module)
-        case fail: ParseFailure =>
-          println(fail.format)
-          sys.exit(1)
+    case Some(conf) if conf.anmlFile.exists() =>
+      conf.anmlFile.getName.split('.') match {
+        case Array(domId, pbId, "pb", "anml") =>
+          // file name formated as domainID.pbID.pb.anml, load domainID.dom.anml first
+          val domainFile = new File(conf.anmlFile.getParentFile, domId + ".dom.anml")
+          if (domainFile.exists()) {
+            Parser.parseFromFile(domainFile) match {
+              case ParseSuccess(domainModule) =>
+                Parser.parseFromFile(conf.anmlFile, Some(domainModule)) match {
+                  case ParseSuccess(completeModel) =>
+                    if (!conf.quiet)
+                      println(completeModel)
+                  case fail: ParseFailure =>
+                    println(fail.format)
+                    sys.exit(1)
+                }
+              case fail: ParseFailure =>
+                println(fail.format)
+                sys.exit(1)
+            }
+          } else {
+            println(s"Error domain file does not exist: $domainFile")
+            sys.exit(1)
+          }
+        case _ =>
+          // not a problem file, load the file standalone
+          Parser.parseFromFile(conf.anmlFile) match {
+            case ParseSuccess(module) =>
+              if (!conf.quiet)
+                println(module)
+            case fail: ParseFailure =>
+              println(fail.format)
+              sys.exit(1)
+          }
       }
+    case Some(conf) =>
+      println(s"Error: requested file does not exist: ${conf.anmlFile}")
+      sys.exit(1)
     case None =>
       sys.exit(1)
   }
