@@ -241,7 +241,10 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
   val interval: Parser[Interval] =
     ("[" ~/
-      ((timepoint ~ "," ~/ timepoint) |
+      ((timepoint ~/ ("," ~/ timepoint).?).map {
+        case (tp, None) => (tp, tp) // "[end]" becomes "[end, end]"
+        case (tp1, Some(tp2)) => (tp1, tp2)
+      } |
         P("all").map(_ => {
           (ctx.findTimepoint("start"), ctx.findTimepoint("end")) match {
             case (Some(st), Some(ed)) => (st, ed)

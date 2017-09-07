@@ -62,6 +62,7 @@ class AnmlParsingTest extends FunSuite {
     "type T; action A(T t) {};",
     "action A { duration == 10; };",
     "fluent boolean sv; action A { [start,end] sv == true; };",
+    "fluent boolean sv; action A { [start] sv == true; [end-1] sv == false; };",
     "type T; fluent boolean sv(T t); action A(T t) { [start,end] sv(t) == false; };",
     "type T; fluent boolean sv(T t); action A(T t) { [all] sv(t) == false; };",
     "constant boolean sv; action A { sv == true; };",
