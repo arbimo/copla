@@ -240,7 +240,13 @@ abstract class AnmlParser(val initialContext: Ctx) {
     timedSymExpr | staticSymExpr
 
   val interval: Parser[Interval] =
-    ("[" ~/ timepoint ~ "," ~/ timepoint ~ "]").map {
+    ("[" ~/
+      ((timepoint ~ "," ~/ timepoint) |
+        P("all").map(_ => { (ctx.findTimepoint("start"), ctx.findTimepoint("end")) match {
+          case (Some(st), Some(ed)) => (st, ed)
+          case _ => sys.error("Start and/or end timepoints are not defined.")
+        }})) ~
+      "]").map {
       case (tp1, tp2) => Interval(tp1, tp2)
     }
 

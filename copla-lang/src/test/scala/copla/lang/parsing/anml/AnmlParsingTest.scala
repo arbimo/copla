@@ -32,6 +32,7 @@ class AnmlParsingTest extends FunSuite {
     "type A with { fluent boolean f(boolean x); };",
     "type A with { fluent boolean f(B x); constant boolean g(boolean x); }; type B;",
     "type A with { fluent boolean f(boolean x); }; instance A a; [start,end] A.f(a, true) == false;",
+    "type A with { fluent boolean f(boolean x); }; instance A a; [all] A.f(a, true) == false;",
     "type A with { fluent boolean f(boolean x); }; instance A a; [start,end] a.f(true) == false;",
     "type A with { fluent boolean f(boolean x); constant boolean g;}; instance A a; [start,end] a.f(a.g()) == a.g();",
     "fluent boolean f(boolean x); constant boolean g(boolean arg); constant boolean h; [start,end] f(true) == g(h);",
@@ -60,6 +61,7 @@ class AnmlParsingTest extends FunSuite {
     "action A { duration == 10; };",
     "fluent boolean sv; action A { [start,end] sv == true; };",
     "type T; fluent boolean sv(T t); action A(T t) { [start,end] sv(t) == false; };",
+    "type T; fluent boolean sv(T t); action A(T t) { [all] sv(t) == false; };",
     "constant boolean sv; action A { sv == true; };",
     "type T; instance T t1; constant T sv(boolean b); action A(T t) { sv(true) != t; };"
   )
