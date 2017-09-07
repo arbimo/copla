@@ -259,11 +259,15 @@ abstract class AnmlParser(val initialContext: Ctx) {
       (freeIdent ~ ":" ~/ Pass) | PassWith(defaultId())
 
     assertionId ~
-      (timedSymExpr ~ "==" ~/ staticSymExpr).namedFilter({
-        case (left, right) => left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
+      (timedSymExpr ~ "==" ~/ staticSymExpr ~ (":->" ~/ staticSymExpr).?).namedFilter({
+        case (left, right, None) => left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
+        case (fluent, from, Some(to)) =>
+          (fluent.typ.isSubtypeOf(from.typ) || from.typ.isSubtypeOf(fluent.typ)) &&
+            (fluent.typ.isSubtypeOf(to.typ) || to.typ.isSubtypeOf(fluent.typ))
       }, "equality-between-compatible-types")
   }.map {
-    case (id, (left, right)) => TimedEqualAssertion(left, right, Some(ctx), id)
+    case (id, (left, right, None)) => TimedEqualAssertion(left, right, Some(ctx), id)
+    case (id, (fluent, from, Some(to))) => TimedTransitionAssertion(fluent, from, to, Some(ctx), id)
   }
 
   val temporallyQualifiedAssertion: Parser[Seq[TemporallyQualifiedAssertion]] = {

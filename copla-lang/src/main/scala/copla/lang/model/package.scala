@@ -37,10 +37,22 @@ package object model {
                                  parent: Option[Ctx],
                                  name: String)
       extends TimedAssertion(parent, name) {
-    override def toString =
+    override def toString: String =
       if (name.startsWith(reservedPrefix)) s"$left == $right"
       else s"$name: $left == $right"
   }
+
+  case class TimedTransitionAssertion(fluent: TimedSymExpr,
+                                      from: StaticSymExpr,
+                                      to: StaticSymExpr,
+                                      parent: Option[Ctx],
+                                      name: String)
+      extends TimedAssertion(parent, name) {
+    override def toString: String =
+      if (name.startsWith(reservedPrefix)) s"$fluent == $from :-> $to"
+      else s"$name: $fluent == $from :-> $to"
+  }
+
   case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion)
       extends ModuleElem
       with ActionElem
@@ -51,10 +63,12 @@ package object model {
   }
 
   trait StaticAssertion extends ModuleElem with ActionElem
-  case class StaticEqualAssertion(left: StaticSymExpr, right: StaticSymExpr) extends StaticAssertion {
+  case class StaticEqualAssertion(left: StaticSymExpr, right: StaticSymExpr)
+      extends StaticAssertion {
     override def toString: String = s"$left == $right"
   }
-  case class StaticDifferentAssertion(left: StaticSymExpr, right: StaticSymExpr) extends StaticAssertion {
+  case class StaticDifferentAssertion(left: StaticSymExpr, right: StaticSymExpr)
+      extends StaticAssertion {
     override def toString: String = s"$left != $right"
   }
 
@@ -199,7 +213,10 @@ package object model {
 
     def -(other: TPRef) = Delay(other, this)
   }
-  case class TimepointDeclaration(tp: TPRef) extends Declaration[TPRef] with ModuleElem with ActionElem {
+  case class TimepointDeclaration(tp: TPRef)
+      extends Declaration[TPRef]
+      with ModuleElem
+      with ActionElem {
     require(tp.delay == 0, "Cannot declare a relative timepoint.")
     override def id       = tp.id
     override def toString = s"timepoint $id"
@@ -225,12 +242,15 @@ package object model {
     def toInScopeString(name: String) = (path :+ name).mkString(".")
   }
 
-  class ActionTemplate(override val name: String, val containingModel: Model, val elems: Seq[ActionElem])
-    extends Ctx
+  class ActionTemplate(override val name: String,
+                       val containingModel: Model,
+                       val elems: Seq[ActionElem])
+      extends Ctx
       with ModuleElem {
     override def parent: Option[Ctx] = Some(containingModel)
 
-    def +(elem: ActionElem): ActionTemplate = new ActionTemplate(name, containingModel, elems :+ elem)
+    def +(elem: ActionElem): ActionTemplate =
+      new ActionTemplate(name, containingModel, elems :+ elem)
     def ++(newElems: Seq[ActionElem]): ActionTemplate = newElems.headOption match {
       case Some(first) => (this + first) ++ newElems.tail
       case None        => this
