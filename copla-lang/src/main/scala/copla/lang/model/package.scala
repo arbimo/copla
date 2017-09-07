@@ -53,6 +53,16 @@ package object model {
       else s"$name: $fluent == $from :-> $to"
   }
 
+  case class TimedAssignmentAssertion(fluent: TimedSymExpr,
+                                      to: StaticSymExpr,
+                                      parent: Option[Ctx],
+                                      name: String)
+      extends TimedAssertion(parent, name) {
+    override def toString: String =
+      if (name.startsWith(reservedPrefix)) s"$fluent := $to"
+      else s"$name: $fluent := $to"
+  }
+
   case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion)
       extends ModuleElem
       with ActionElem

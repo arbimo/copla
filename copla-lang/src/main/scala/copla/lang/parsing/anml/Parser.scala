@@ -242,7 +242,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
   val interval: Parser[Interval] =
     ("[" ~/
       ((timepoint ~/ ("," ~/ timepoint).?).map {
-        case (tp, None) => (tp, tp) // "[end]" becomes "[end, end]"
+        case (tp, None)       => (tp, tp) // "[end]" becomes "[end, end]"
         case (tp1, Some(tp2)) => (tp1, tp2)
       } |
         P("all").map(_ => {
@@ -256,21 +256,27 @@ abstract class AnmlParser(val initialContext: Ctx) {
     }
 
   val timedAssertion: Parser[TimedAssertion] = {
+    // variable that hold the first two parsed token to facilitate type checking logic
+    var id: String           = null
+    var fluent: TimedSymExpr = null
 
-    /** Read an identifier or construct a default one otherwise */
+    def compatibleTypes(t1: Type, t2: Type): Boolean = t1.isSubtypeOf(t2) || t2.isSubtypeOf(t1)
+
+    /** Reads a static symbolic expressions whose type is compatible with the one of the fluent */
+    val rightSideExpr: Parser[StaticSymExpr] = staticSymExpr.namedFilter(
+      expr => compatibleTypes(fluent.typ, expr.typ),
+      "has-compatible-type")
+
+    /** Reads an identifier or construct a default one otherwise */
     val assertionId: Parser[String] =
       (freeIdent ~ ":" ~/ Pass) | PassWith(defaultId())
 
-    assertionId ~
-      (timedSymExpr ~ "==" ~/ staticSymExpr ~ (":->" ~/ staticSymExpr).?).namedFilter({
-        case (left, right, None) => left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
-        case (fluent, from, Some(to)) =>
-          (fluent.typ.isSubtypeOf(from.typ) || from.typ.isSubtypeOf(fluent.typ)) &&
-            (fluent.typ.isSubtypeOf(to.typ) || to.typ.isSubtypeOf(fluent.typ))
-      }, "equality-between-compatible-types")
-  }.map {
-    case (id, (left, right, None)) => TimedEqualAssertion(left, right, Some(ctx), id)
-    case (id, (fluent, from, Some(to))) => TimedTransitionAssertion(fluent, from, to, Some(ctx), id)
+    assertionId.sideEffect(id = _).silent ~
+      (timedSymExpr.sideEffect(fluent = _).silent ~
+        (("==" ~/ rightSideExpr ~ (":->" ~/ rightSideExpr).?).map {
+          case (expr, None)     => TimedEqualAssertion(fluent, expr, Some(ctx), id)
+          case (from, Some(to)) => TimedTransitionAssertion(fluent, from, to, Some(ctx), id)
+        } | (":=" ~/ rightSideExpr).map(e => TimedAssignmentAssertion(fluent, e, Some(ctx), id))))
   }
 
   val temporallyQualifiedAssertion: Parser[Seq[TemporallyQualifiedAssertion]] = {
