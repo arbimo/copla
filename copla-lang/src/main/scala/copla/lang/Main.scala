@@ -1,21 +1,37 @@
 package copla.lang
 
-import copla.lang.parsing.anml.Parser
-import fastparse.core.Parsed.Success
+import java.io.File
+
+import copla.lang.parsing.anml.{ParseFailure, ParseSuccess, Parser}
 
 object Main extends App {
-  if(args.length != 1) {
-    println("Error: should provide the name of an ANML file.")
-    System.exit(1)
-  } else {
-    val source = scala.io.Source.fromFile(args(0))
-    val input = source.getLines.mkString("\n")
-    Parser.parse(input) match {
-      case Success(module, _) =>
-        println("AS:\n" + module + "\n\n")
-      case x =>
-        println(s"Could not parse anml string: \n$x")
-        System.exit(1)
-    }
+
+  case class Config(anmlFile: File = new File("."), quiet: Boolean = false)
+
+  val optionsParser = new scopt.OptionParser[Config]("copla-lang") {
+    head("""copla-lang is a set of libraries and command line utilities
+        |to manipulate ANML files in the CoPla project.\n""".stripMargin)
+
+    opt[Unit]('q', "quiet")
+      .text("Do not print the result of parsing.")
+      .action((_, c) => c.copy(quiet = true))
+
+    arg[File]("anml-file")
+      .text("ANML file to parse.")
+      .action((f, c) => c.copy(anmlFile = f))
+  }
+
+  optionsParser.parse(args, Config()) match {
+    case Some(conf) =>
+      Parser.parseFromFile(conf.anmlFile) match {
+        case ParseSuccess(module) =>
+          if (!conf.quiet)
+            println(module)
+        case fail: ParseFailure =>
+          println(fail.format)
+          sys.exit(1)
+      }
+    case None =>
+      sys.exit(1)
   }
 }

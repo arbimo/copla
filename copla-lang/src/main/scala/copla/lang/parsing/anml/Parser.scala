@@ -1,11 +1,13 @@
 package copla.lang.parsing.anml
 
-import copla.lang.model._
+import java.io.File
 
+import copla.lang.model._
 import ParserApi.baseApi._
 import ParserApi.baseApi.Parsed.Success
 import ParserApi.whiteApi._
 import ParserApi.extendedApi._
+import fastparse.core.Parsed.Failure
 
 abstract class AnmlParser(val initialContext: Ctx) {
 
@@ -518,11 +520,61 @@ object Parser {
     case x => sys.error(s"Could not parse types the base anml model: $x")
   }
 
-  def parse(input: String) = {
-    new AnmlTypeParser(baseAnmlModel).parse(input) match {
-      case Success(m, _) =>
-        new AnmlModuleParser(m).parse(input)
-      case x => x
+  def parse(input: String, previousModel: Option[Model] = None): ParseResult = {
+    def formatFailure(failure: Failure[Char, String]): ParseFailure = {
+      def toLineAndColumn(lines: Iterable[String],
+                          index: Int,
+                          lineNumber: Int = 0): (String, Int, Int) =
+        if (lines.nonEmpty && index <= lines.head.length)
+          (lines.head, lineNumber, index)
+        else if (lines.nonEmpty)
+          toLineAndColumn(lines.tail, index - lines.head.length - 1, lineNumber + 1)
+        else
+          sys.error("Index is not in the provided lines")
+
+      val (faultyLine, faultyLineNumber, faultyColumnNumber) =
+        toLineAndColumn(input.split('\n'), failure.index)
+      ParseFailure(faultyLine, faultyLineNumber, faultyColumnNumber, failure.lastParser, None)
     }
+
+    new AnmlTypeParser(previousModel.getOrElse(baseAnmlModel)).parse(input) match {
+      case Success(modelWithTypes, _) =>
+        new AnmlModuleParser(modelWithTypes).parse(input) match {
+          case Success(fullModel, _)    => ParseSuccess(fullModel)
+          case x: Failure[Char, String] => formatFailure(x)
+        }
+      case x: Failure[Char, String] => formatFailure(x)
+    }
+  }
+
+  def parseFromFile(file: File, previousModel: Option[Model] = None): ParseResult = {
+    val source = scala.io.Source.fromFile(file)
+    var input: String = null
+    try {
+      input = source.getLines.mkString("\n")
+    } finally {
+      source.close()
+    }
+    parse(input, previousModel) match {
+      case x: ParseSuccess => x
+      case x: ParseFailure => x.copy(file = Some(file))
+    }
+  }
+}
+
+trait ParseResult
+case class ParseSuccess(model: Model) extends ParseResult
+case class ParseFailure(faultyLine: String,
+                        lineIndex: Int,
+                        columnIndex: Int,
+                        lastParser: Parser[Any],
+                        file: Option[File])
+    extends ParseResult {
+
+  def format: String = {
+    s"Could not parse anml string at (${lineIndex + 1}:${columnIndex + 1}) ${file.map("[" + _.toString + "]").getOrElse("")}:\n" +
+      faultyLine + "\n" +
+      " " * columnIndex + "^\n" +
+      s"Expected: $lastParser"
   }
 }

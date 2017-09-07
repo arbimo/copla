@@ -34,7 +34,8 @@ lazy val coplaLang = crossProject(JVMPlatform, NativePlatform)
   .jvmSettings(commonJVMSettings: _*)
   .nativeSettings(commonNativeSettings: _*)
   .settings(libraryDependencies ++= Seq(
-    "com.lihaoyi" %%% "fastparse" % "0.4.4"
+    "com.lihaoyi" %%% "fastparse" % "0.4.4",
+    "com.github.scopt" %%% "scopt" % "3.7.0"
   ))
 
 lazy val coplaLangJVM = coplaLang.jvm

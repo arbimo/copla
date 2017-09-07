@@ -106,11 +106,11 @@ class AnmlParsingTest extends FunSuite {
   for (anml <- valid) {
     test("valid: " + anml) {
       Parser.parse(anml) match {
-        case Success(module, _) =>
+        case ParseSuccess(module) =>
           println("PARSED:\n" + anml + "\n")
           println("AS:\n" + module + "\n\n")
-        case x =>
-          fail(s"Could not parse anml string: $x\n\n$anml\n")
+        case x: ParseFailure =>
+          fail(s"Could not parse anml string: $anml\n\n${x.format}")
       }
     }
   }
@@ -118,10 +118,10 @@ class AnmlParsingTest extends FunSuite {
   for (anml <- invalid) {
     test("invalid: " + anml) {
       Parser.parse(anml) match {
-        case Success(module, _) =>
+        case ParseSuccess(module) =>
           fail(s"Following anml string should be invalid:\n$anml\n\nParsed to:\n $module")
-        case x =>
-          println(s"Detected invalid ANML: $x\n$anml")
+        case x: ParseFailure =>
+          println(s"Detected invalid ANML:\n${x.format}")
       }
     }
   }
