@@ -242,10 +242,12 @@ abstract class AnmlParser(val initialContext: Ctx) {
   val interval: Parser[Interval] =
     ("[" ~/
       ((timepoint ~ "," ~/ timepoint) |
-        P("all").map(_ => { (ctx.findTimepoint("start"), ctx.findTimepoint("end")) match {
-          case (Some(st), Some(ed)) => (st, ed)
-          case _ => sys.error("Start and/or end timepoints are not defined.")
-        }})) ~
+        P("all").map(_ => {
+          (ctx.findTimepoint("start"), ctx.findTimepoint("end")) match {
+            case (Some(st), Some(ed)) => (st, ed)
+            case _                    => sys.error("Start and/or end timepoints are not defined.")
+          }
+        })) ~
       "]").map {
       case (tp1, tp2) => Interval(tp1, tp2)
     }
@@ -264,9 +266,12 @@ abstract class AnmlParser(val initialContext: Ctx) {
     case (id, (left, right)) => TimedEqualAssertion(left, right, Some(ctx), id)
   }
 
-  val temporallyQualifiedAssertion: Parser[TemporallyQualifiedAssertion] = {
-    (interval ~/ timedAssertion ~ ";")
-      .map { case (it, assertion) => TemporallyQualifiedAssertion(it, assertion) }
+  val temporallyQualifiedAssertion: Parser[Seq[TemporallyQualifiedAssertion]] = {
+    (interval ~/
+      ((("{" ~ (!"}" ~/ timedAssertion ~ ";").rep ~ "}") |
+        timedAssertion.map(Seq(_)))
+        ~ ";"))
+      .map { case (it, assertions) => assertions.map(TemporallyQualifiedAssertion(it, _)) }
   }
 
   val staticAssertion: Parser[StaticAssertion] =
@@ -277,14 +282,18 @@ abstract class AnmlParser(val initialContext: Ctx) {
         case (_, Some(_)) => true
         case (expr, None) => expr.typ.id.name == "boolean"
       }, "boolean-if-no-right-side")
-      .namedFilter({
-        case (left, Some((_, right))) => left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
-        case (_, None) => true // already checked that it is a boolean
-      }, "equality-between-compatible-types")
+      .namedFilter(
+        {
+          case (left, Some((_, right))) =>
+            left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
+          case (_, None) => true // already checked that it is a boolean
+        },
+        "equality-between-compatible-types"
+      )
       .map {
         case (left, Some(("==", right))) => StaticEqualAssertion(left, right)
         case (left, Some(("!=", right))) => StaticDifferentAssertion(left, right)
-        case (expr, None) => StaticEqualAssertion(expr, ctx.findVariable("true").get)
+        case (expr, None)                => StaticEqualAssertion(expr, ctx.findVariable("true").get)
       }
 }
 
@@ -377,7 +386,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
       functionDeclaration.map(Seq(_)) |
       timepointDeclaration.map(Seq(_)) |
       temporalConstraint |
-      temporallyQualifiedAssertion.map(Seq(_)) |
+      temporallyQualifiedAssertion |
       staticAssertion.map(Seq(_)) |
       action.map(Seq(_))
 
@@ -406,7 +415,7 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
 
   private def currentAction: ActionTemplate = ctx match {
     case a: ActionTemplate => a
-    case _      => sys.error("Current context is not an action.")
+    case _                 => sys.error("Current context is not an action.")
   }
 
   /** Creates an action template with the given name and its default content (i.e. start/end timepoints). */
@@ -437,7 +446,7 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
         .sideEffect(argDeclarations => updateContext(currentAction ++ argDeclarations)) ~
       "{" ~/
       (temporalConstraint |
-        temporallyQualifiedAssertion.map(Seq(_)) |
+        temporallyQualifiedAssertion |
         staticAssertion.map(Seq(_)))
         .sideEffect(x => updateContext(currentAction ++ x)) // add assertions to the current action
         .rep ~

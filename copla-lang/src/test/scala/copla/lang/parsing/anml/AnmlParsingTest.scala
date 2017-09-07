@@ -40,6 +40,7 @@ class AnmlParsingTest extends FunSuite {
     "fluent boolean a1; variable boolean a2; function boolean a3; predicate a4;",
     "constant boolean x(boolean arg); constant boolean y; ",
     "constant boolean f(boolean x); fluent boolean g(boolean x); [start,end] g(true) == f(false);",
+    "constant boolean f(boolean x); fluent boolean g(boolean x); [all] { g(true) == f(false); g(false) == true; g(true) == false; };",
     "constant boolean f; constant boolean g; f != g;",
     "constant boolean f; constant boolean g; f == g;",
     "constant boolean f; f;",
