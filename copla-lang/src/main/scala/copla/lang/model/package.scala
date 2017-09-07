@@ -81,6 +81,10 @@ package object model {
       extends StaticAssertion {
     override def toString: String = s"$left != $right"
   }
+  case class StaticAssignmentAssertion(left: StaticSymExpr, right: StaticSymExpr)
+      extends StaticAssertion {
+    override def toString: String = s"$left := $right"
+  }
 
   trait Declaration[T] {
     def id: Id
@@ -89,6 +93,8 @@ package object model {
   case class Type(id: Id, parent: Option[Type]) {
     def isSubtypeOf(typ: Type): Boolean =
       this == typ || parent.exists(t => t == typ || t.isSubtypeOf(typ))
+
+    def overlaps(typ: Type): Boolean = this.isSubtypeOf(typ) || typ.isSubtypeOf(this)
 
     def asScope: Scope = id.scope + id.name
 
@@ -115,9 +121,12 @@ package object model {
       extends Declaration[FunctionTemplate]
       with ModuleElem {
     override def id = func.id
-    override def toString = func match {
-      case _: FluentTemplate   => s"fluent ${func.typ} ${func.id}(${func.params.mkString(", ")})"
-      case _: ConstantTemplate => s"constant ${func.typ} ${func.id}(${func.params.mkString(", ")})"
+    override def toString: String = {
+      val paramsString = "(" + func.params.map(p => s"${p.typ} ${p.id.name}").mkString(", ") + ")"
+      func match {
+        case _: FluentTemplate   => s"fluent ${func.typ} ${func.id}$paramsString"
+        case _: ConstantTemplate => s"constant ${func.typ} ${func.id}$paramsString"
+      }
     }
   }
 
@@ -178,17 +187,17 @@ package object model {
   case class InstanceDeclaration(instance: Instance)
       extends VarDeclaration[Instance]
       with ModuleElem {
-    override def variable = instance
-    override def toString = s"instance ${instance.typ} ${instance.id}"
+    override def variable: Instance = instance
+    override def toString: String   = s"instance ${instance.typ} ${instance.id}"
   }
 
   /** Denote the argument of the template of state variables and actions. */
   case class Arg(id: Id, typ: Type) extends Var {
-    override def toString = s"${typ.id} $id"
+    override def toString: String = id.toString
   }
   case class ArgDeclaration(arg: Arg) extends VarDeclaration[Arg] with ActionElem {
-    override def variable = arg
-    override def toString = arg.toString
+    override def variable: Arg    = arg
+    override def toString: String = s"${arg.typ.id} ${arg.id}"
   }
 
   /*** Time ***/

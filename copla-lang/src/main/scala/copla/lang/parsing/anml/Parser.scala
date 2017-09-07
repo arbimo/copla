@@ -289,27 +289,24 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .map { case (it, assertions) => assertions.map(TemporallyQualifiedAssertion(it, _)) }
   }
 
-  val staticAssertion: Parser[StaticAssertion] =
-    (staticSymExpr ~/
-      (("==" | "!=").! ~/ staticSymExpr).? ~
+  val staticAssertion: Parser[StaticAssertion] = {
+    var leftExpr: StaticSymExpr = null
+    (staticSymExpr.sideEffect(leftExpr = _) ~/
+      (("==" | "!=" | ":=").! ~/
+        staticSymExpr.namedFilter(_.typ.overlaps(leftExpr.typ), "has-compatible-type")).? ~
       ";")
       .namedFilter({
         case (_, Some(_)) => true
         case (expr, None) => expr.typ.id.name == "boolean"
       }, "boolean-if-no-right-side")
-      .namedFilter(
-        {
-          case (left, Some((_, right))) =>
-            left.typ.isSubtypeOf(right.typ) || right.typ.isSubtypeOf(left.typ)
-          case (_, None) => true // already checked that it is a boolean
-        },
-        "equality-between-compatible-types"
-      )
       .map {
         case (left, Some(("==", right))) => StaticEqualAssertion(left, right)
         case (left, Some(("!=", right))) => StaticDifferentAssertion(left, right)
-        case (expr, None)                => StaticEqualAssertion(expr, ctx.findVariable("true").get)
+        case (left, Some((":=", right))) => StaticAssignmentAssertion(left, right)
+        case (expr, None) => StaticEqualAssertion(expr, ctx.findVariable("true").get)
+        case _ => sys.error("Something is wrong with this parser.")
       }
+  }
 }
 
 /** Second phase parser that extracts all ANML elements expects types that should

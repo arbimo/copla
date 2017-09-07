@@ -1,6 +1,5 @@
 package copla.lang.parsing.anml
 
-import fastparse.core.Parsed.Success
 import org.scalatest.FunSuite
 
 class AnmlParsingTest extends FunSuite {
@@ -40,6 +39,7 @@ class AnmlParsingTest extends FunSuite {
     "fluent boolean f(boolean x); constant boolean g(boolean arg); constant boolean h(boolean arg); [start,end] f(g(true)) == g(h(true));",
     "fluent boolean a1; variable boolean a2; function boolean a3; predicate a4;",
     "constant boolean x(boolean arg); constant boolean y; ",
+    "constant boolean x(boolean arg); constant boolean y; x(y) := true;",
     "constant boolean f(boolean x); fluent boolean g(boolean x); [start,end] g(true) == f(false);",
     "constant boolean f(boolean x); fluent boolean g(boolean x); [start,end] g(true) == f(false) :-> true;",
     "constant boolean f(boolean x); fluent boolean g(boolean x); [all] { g(true) == f(false); g(false) == true; g(true) == false; };",
