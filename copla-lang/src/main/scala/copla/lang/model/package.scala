@@ -28,9 +28,9 @@ package object model {
   trait StaticSymExpr extends SymExpr
 
   abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx with ModuleElem {
-    override val elems =
-      Seq(TimepointDeclaration(TPRef(this.id("start"))),
-          TimepointDeclaration(TPRef(this.id("end"))))
+    override val store: ElemStore = new ElemStore() +
+      TimepointDeclaration(TPRef(this.id("start"))) +
+      TimepointDeclaration(TPRef(this.id("end")))
   }
   case class TimedEqualAssertion(left: TimedSymExpr,
                                  right: StaticSymExpr,
@@ -98,7 +98,7 @@ package object model {
 
     def asScope: Scope = id.scope + id.name
 
-    override def toString = id.toString
+    override def toString: String = id.toString
   }
   case class TypeDeclaration(typ: Type) extends Declaration[Type] with ModuleElem {
     override def id = typ.id
@@ -115,7 +115,7 @@ package object model {
 
   case class FluentTemplate(id: Id, typ: Type, params: Seq[Arg]) extends FunctionTemplate {
 
-    override def toString = id.toString
+    override def toString: String = id.toString
   }
   case class FunctionDeclaration(func: FunctionTemplate)
       extends Declaration[FunctionTemplate]
@@ -137,14 +137,14 @@ package object model {
         require(v.typ.isSubtypeOf(tpl.typ), s"$v is not of type ${tpl.typ}")
     }
 
-    override def typ = template.typ
+    override def typ: Type = template.typ
 
     override def toString = s"$template(${params.mkString(", ")})"
   }
 
   case class ConstantTemplate(id: Id, typ: Type, params: Seq[Arg]) extends FunctionTemplate {
 
-    override def toString = id.toString
+    override def toString: String = id.toString
   }
 
   case class Constant(template: ConstantTemplate, params: Seq[StaticSymExpr])
@@ -155,9 +155,9 @@ package object model {
         require(v.typ.isSubtypeOf(tpl.typ), s"$v is not of type ${tpl.typ}")
     }
 
-    override def typ = template.typ
+    override def typ: Type = template.typ
 
-    override def toString = s"$template(${params.mkString(", ")})"
+    override def toString: String = s"$template(${params.mkString(", ")})"
   }
 
   trait Var extends StaticSymExpr {
@@ -177,12 +177,12 @@ package object model {
   case class LocalVarDeclaration(variable: LocalVar)
       extends VarDeclaration[LocalVar]
       with ModuleElem {
-    override def toString = s"constant ${variable.typ} ${variable.id}"
+    override def toString: String = s"constant ${variable.typ} ${variable.id}"
   }
 
   /** Instance of a given type, result of the ANML statement "instance Type id;" */
   case class Instance(id: Id, typ: Type) extends Var {
-    override def toString = id.toString
+    override def toString: String = id.toString
   }
   case class InstanceDeclaration(instance: Instance)
       extends VarDeclaration[Instance]
@@ -214,7 +214,7 @@ package object model {
   /** A timepoint, declared when appearing in the root of a context.*/
   case class TPRef(id: Id, delay: Int = 0) {
 
-    override def toString =
+    override def toString: String =
       id.toString + (delay match {
         case 0          => ""
         case d if d > 0 => s"+$d"
@@ -237,12 +237,12 @@ package object model {
       with ModuleElem
       with ActionElem {
     require(tp.delay == 0, "Cannot declare a relative timepoint.")
-    override def id       = tp.id
-    override def toString = s"timepoint $id"
+    override def id: Id           = tp.id
+    override def toString: String = s"timepoint $id"
   }
 
   case class Interval(start: TPRef, end: TPRef) {
-    override def toString = s"[$start, $end]"
+    override def toString: String = s"[$start, $end]"
   }
 
   case class TBefore(from: TPRef, to: TPRef) extends Statement {
@@ -250,76 +250,81 @@ package object model {
   }
 
   case class Id(scope: Scope, name: String) {
-    override def toString = scope.toInScopeString(name)
+    override def toString: String = scope.toScopedString(name)
   }
 
   case class Scope(path: Seq[String]) {
 
     def +(nestedScope: String): Scope = Scope(path :+ nestedScope)
 
-    override def toString             = path.mkString(".")
-    def toInScopeString(name: String) = (path :+ name).mkString(".")
+    override def toString: String            = path.mkString(".")
+    def toScopedString(name: String): String = (path :+ name).mkString(".")
   }
 
   class ActionTemplate(override val name: String,
                        val containingModel: Model,
-                       val elems: Seq[ActionElem])
+                       override val store: ElemStore)
       extends Ctx
       with ModuleElem {
     override def parent: Option[Ctx] = Some(containingModel)
 
     def +(elem: ActionElem): ActionTemplate =
-      new ActionTemplate(name, containingModel, elems :+ elem)
+      new ActionTemplate(name, containingModel, store + elem)
     def ++(newElems: Seq[ActionElem]): ActionTemplate = newElems.headOption match {
       case Some(first) => (this + first) ++ newElems.tail
       case None        => this
     }
 
     override def toString: String =
-      s"action $name(${elems.collect { case ArgDeclaration(Arg(id, typ)) => s"$typ ${id.name}" }.mkString(", ")}) {\n" +
-        elems.map("    " + _.toString).mkString("\n") +
+      s"action $name(${store.elems.collect { case ArgDeclaration(Arg(id, typ)) => s"$typ ${id.name}" }.mkString(", ")}) {\n" +
+        store.elems.map("    " + _.toString).mkString("\n") +
         "  };"
   }
 
+  class ElemStore private (val elems: Vector[Elem], val declarations: Map[Id, Declaration[_]]) {
+
+    def this() = this(Vector(), Map())
+
+    def +(e: Elem): ElemStore = {
+      val newElems = elems :+ e
+      val toProcess = (e match {
+        case wrapper: Wrapper =>
+          wrapper +: wrapper.wrapped
+        case x => Seq(x)
+      }).flatMap {
+        case ctx: Ctx => ctx.store.elems :+ ctx
+        case x        => Seq(x)
+      }
+      val newDeclarations = declarations ++ toProcess.collect {
+        case x: Declaration[_] => (x.id, x)
+      }
+
+      new ElemStore(newElems, newDeclarations)
+    }
+  }
+
   trait Ctx {
-    val elems: Seq[Elem]
+
+    final val scope: Scope = parent.map(_.scope + name).getOrElse(Scope(Seq()))
+    assert(scope != null)
+
+    def id(name: String): Id = Id(scope, name)
+
     def parent: Option[Ctx]
     def name: String
     def root: Ctx = parent match {
       case Some(p) => p.root
       case None    => this
     }
-
-    final val scope: Scope = parent.map(_.scope + name).getOrElse(Scope(Seq()))
-    assert(scope != null)
-
-    def allElems: Seq[Elem] = elems.flatMap {
-      case wrapper: Wrapper => wrapper +: wrapper.wrapped
-      case any: Any         => Seq(any)
-    }
-
-    private[this] lazy val declarations: Map[Id, Declaration[_]] =
-      allElems.collect {
-        case x: Declaration[_] => (x.id, x)
-      }.toMap
-
-    private[this] lazy val subContexts: Map[String, Ctx] =
-      allElems.collect {
-        case x: Ctx => (x.name, x)
-      }.toMap
-
-    def id(name: String): Id = Id(scope, name)
+    def store: ElemStore
 
     def findDeclaration(localID: String): Option[Declaration[_]] = {
       (localID.split("\\.").toList match {
         case single :: Nil =>
-          declarations.get(id(single))
+          store.declarations.get(id(single))
         case subScopeName :: name :: Nil =>
-          declarations
+          store.declarations
             .get(Id(scope + subScopeName, name))
-            .orElse(
-              subContexts.get(subScopeName).flatMap(_.findDeclaration(name))
-            )
         case Nil =>
           sys.error("Invalid name: " + localID)
         case _ =>
@@ -365,12 +370,12 @@ package object model {
 
   }
 
-  case class Model(elems: Seq[ModuleElem] = mutable.Buffer()) extends Ctx {
+  case class Model(store: ElemStore = new ElemStore()) extends Ctx {
     override def parent = None
     override def name   = "_module_"
 
     def +(elem: ModuleElem): Option[Model] = {
-      Some(Model(elem +: elems))
+      Some(Model(store + elem))
     }
 
     def ++(elems: Seq[ModuleElem]): Option[Model] = {
@@ -379,10 +384,9 @@ package object model {
 
     override def toString =
       "module:\n" +
-        elems
-          .filter(!Parser.baseAnmlModel.elems.contains(_))
+        store.elems
+          .filter(!Parser.baseAnmlModel.store.elems.contains(_))
           .map("  " + _)
-          .reverse
           .mkString("\n")
   }
 }

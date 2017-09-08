@@ -430,7 +430,7 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
       case m: Model => m
       case _        => sys.error("Starting to parse an action while the context is not a model.")
     }
-    val emptyAct = new ActionTemplate(actionName, container, Nil)
+    val emptyAct = new ActionTemplate(actionName, container, new ElemStore())
     emptyAct +
       TimepointDeclaration(TPRef(Id(emptyAct.scope, "start"))) +
       TimepointDeclaration(TPRef(Id(emptyAct.scope, "end")))
