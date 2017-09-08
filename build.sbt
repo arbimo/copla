@@ -31,7 +31,7 @@ lazy val commonNativeSettings = Seq(
 )
 
 lazy val root = project.in(file(".")).
-  aggregate(coplaLangJVM, coplaConstraints).
+  aggregate(coplaLangJVM, coplaConstraints, coplaPlanning).
   settings(
     publish := {},
     publishLocal := {}
@@ -59,4 +59,14 @@ lazy val coplaConstraints = project.in(file("copla-constraints"))
   .settings(commonJVMSettings: _*)
   .settings(libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+  ))
+
+lazy val coplaPlanning = project.in(file("copla-planning"))
+  .dependsOn(coplaConstraints, coplaLangJVM)
+  .settings(name := "copla-planning")
+  .settings(commonSettings: _*)
+  .settings(commonJVMSettings: _*)
+  .settings(libraryDependencies ++= Seq(
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+    "com.github.scopt" %%% "scopt" % "3.7.0"
   ))
