@@ -3,7 +3,7 @@ name := "copla-build"
 // global settings
 lazy val commonSettings = Seq(
   organization := "com.github.arthur-bit-monnot",
-  version := "0.1",
+  version := "0.2-SNAPSHOT",
   crossPaths := true,
   
   // To sync with Maven central
