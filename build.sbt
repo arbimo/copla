@@ -3,8 +3,18 @@ name := "copla-build"
 // global settings
 lazy val commonSettings = Seq(
   organization := "com.github.arthur-bit-monnot",
-  version := "0.1-SNAPSHOT",
-  crossPaths := true
+  version := "0.1",
+  crossPaths := true,
+  
+  // To sync with Maven central
+  publishMavenStyle := true,
+
+  // POM settings for Sonatype
+  homepage := Some(url("https://github.com/arthur-bit-monnot/copla")),
+  scmInfo := Some(ScmInfo(url("https://github.com/arthur-bit-monnot/copla"), "git@github.com:arthur-bit-monnot/fape.git")),
+  developers += Developer("abitmonn", "Arthur Bit-Monnot", "arthur.bit-monnot@laas.fr", url("https://github.com/arthur-bit-monnot")),
+  licenses += ("BSD-2-Clause", url("https://opensource.org/licenses/BSD-2-Clause")),
+  pomIncludeRepository := (_ => false)
 )
 
 lazy val commonJVMSettings = Seq(
@@ -15,7 +25,9 @@ lazy val commonJVMSettings = Seq(
 )
 
 lazy val commonNativeSettings = Seq(
-  scalaVersion := "2.11.11"
+  scalaVersion := "2.11.11",
+  nativeGC := "immix",
+  nativeMode := "release"
 )
 
 lazy val root = project.in(file(".")).
