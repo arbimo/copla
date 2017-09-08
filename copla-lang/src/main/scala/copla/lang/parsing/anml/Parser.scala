@@ -15,7 +15,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
     * It is used by many suparsers to find the variable/fluent/type associated to an identifier.
     * Over the course of Parsing, the current context is likely to change (i.e. `ctx` will point to
     * a new context since [[Ctx]] is immutable. */
-  protected var ctx = initialContext
+  protected var ctx: Ctx = initialContext
   protected def updateContext(newContext: Ctx) {
     ctx = newContext
   }
@@ -27,25 +27,25 @@ abstract class AnmlParser(val initialContext: Ctx) {
   }
   val int: Parser[Int] = CharsWhileIn('0' to '9').!.map(_.toInt).opaque("int")
 
-  val typeKW      = word.filter(_ == "type").silent.opaque("type")
-  val withKW      = word.filter(_ == "with").silent.opaque("with")
-  val instanceKW  = word.filter(_ == "instance").silent.opaque("instance")
-  val fluentKW    = word.filter(_ == "fluent").silent.opaque("fluent")
-  val constantKW  = word.filter(_ == "constant").silent.opaque("constant")
-  val timepointKW = word.filter(_ == "timepoint").silent.opaque("instance")
-  val actionKW    = word.filter(_ == "action").silent.opaque("action")
-  val durationKW  = word.filter(_ == "duration").silent.opaque("duration")
-  val keywords =
+  val typeKW: Parser[Unit]      = word.filter(_ == "type").silent.opaque("type")
+  val withKW: Parser[Unit]      = word.filter(_ == "with").silent.opaque("with")
+  val instanceKW: Parser[Unit]  = word.filter(_ == "instance").silent.opaque("instance")
+  val fluentKW: Parser[Unit]    = word.filter(_ == "fluent").silent.opaque("fluent")
+  val constantKW: Parser[Unit]  = word.filter(_ == "constant").silent.opaque("constant")
+  val timepointKW: Parser[Unit] = word.filter(_ == "timepoint").silent.opaque("instance")
+  val actionKW: Parser[Unit]    = word.filter(_ == "action").silent.opaque("action")
+  val durationKW: Parser[Unit]  = word.filter(_ == "duration").silent.opaque("duration")
+  val keywords: Set[String] =
     Set("type", "instance", "action", "duration", "fluent", "variable", "predicate", "timepoint")
-  val reservedTypeNames = Set()
-  val nonIdent          = keywords ++ reservedTypeNames
+  val nonIdent: Set[String] = keywords
 
-  val simpleIdent              = word.opaque("ident").namedFilter(!nonIdent.contains(_), "not-reserved")
-  val ident: Parser[String]    = simpleIdent.rep(min = 1, sep = ".").!.opaque("possibly-nested-ident")
-  val typeName: Parser[String] = word.filter(!keywords.contains(_)).opaque("type-name")
-  val variableName             = ident.opaque("variable-name")
+  val simpleIdent: Parser[String] =
+    word.opaque("ident").namedFilter(!nonIdent.contains(_), "not-reserved")
+  val ident: Parser[String]        = simpleIdent.rep(min = 1, sep = ".").!.opaque("possibly-nested-ident")
+  val typeName: Parser[String]     = word.filter(!keywords.contains(_)).opaque("type-name")
+  val variableName: Parser[String] = ident.opaque("variable-name")
 
-  val freeIdent =
+  val freeIdent: Parser[String] =
     simpleIdent
       .namedFilter(id =>
                      ctx.findDeclaration(id) match {
@@ -303,8 +303,8 @@ abstract class AnmlParser(val initialContext: Ctx) {
         case (left, Some(("==", right))) => StaticEqualAssertion(left, right)
         case (left, Some(("!=", right))) => StaticDifferentAssertion(left, right)
         case (left, Some((":=", right))) => StaticAssignmentAssertion(left, right)
-        case (expr, None) => StaticEqualAssertion(expr, ctx.findVariable("true").get)
-        case _ => sys.error("Something is wrong with this parser.")
+        case (expr, None)                => StaticEqualAssertion(expr, ctx.findVariable("true").get)
+        case _                           => sys.error("Something is wrong with this parser.")
       }
   }
 }
@@ -374,7 +374,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
       ~ (withKW ~/ "{" ~/ functionDeclaration.rep ~ "}").?
       ~ ";")
       .map {
-        case (t, _, None) => Seq()
+        case (_, _, None) => Seq()
         case (t, _, Some(funcDecl)) =>
           funcDecl.map(fd => {
             val id            = Id(t.asScope, fd.id.name)
@@ -409,9 +409,10 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
 
   private[this] val anmlParser: Parser[Model] =
     // for each elem parsed, update the current model
-    (Pass ~ elem.optGet(currentModel ++ _).sideEffect(updateContext(_)).silent).rep ~ End.map(_ => currentModel)
+    (Pass ~ elem.optGet(currentModel ++ _).sideEffect(updateContext(_)).silent).rep ~ End.map(_ =>
+      currentModel)
 
-  def parse(input: String) = {
+  def parse(input: String): Parsed[Model] = {
     updateContext(initialModel)
     anmlParser.parse(input)
   }
@@ -464,11 +465,12 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
 /** First phase parser used to extract all type declarations from a given ANML string. */
 class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
 
-  val nonTypeToken =
+  val nonTypeToken: Parser[String] =
     (word | int | CharIn("{}[]();=:<>-+.,!/*")).!.namedFilter(_ != "type", "non-type-token")
-  val typeDeclaration = (typeKW ~/ freeIdent ~ ("<" ~ declaredType).? ~ (";" | withKW)).map {
-    case (name, parentOpt) => TypeDeclaration(Type(ctx.id(name), parentOpt))
-  }
+  val typeDeclaration: Parser[TypeDeclaration] =
+    (typeKW ~/ freeIdent ~ ("<" ~ declaredType).? ~ (";" | withKW)).map {
+      case (name, parentOpt) => TypeDeclaration(Type(ctx.id(name), parentOpt))
+    }
 
   private[this] def currentModel: Model = ctx match {
     case m: Model => m
@@ -476,10 +478,11 @@ class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
   }
 
   private[this] val parser: Parser[Model] = {
-    val typeDeclarationWithUpdate = typeDeclaration.optGet(currentModel + _).sideEffect(updateContext(_))
+    val typeDeclarationWithUpdate =
+      typeDeclaration.optGet(currentModel + _).sideEffect(updateContext(_))
     ((Pass ~ (nonTypeToken | typeDeclarationWithUpdate).silent).rep ~ End).map(_ => currentModel)
   }
-  def parse(input: String) = {
+  def parse(input: String): Parsed[Model] = {
     updateContext(initialModel)
     parser.parse(input)
   }
@@ -487,7 +490,7 @@ class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
 
 object Parser {
 
-  val anmlHeader =
+  private val anmlHeader =
     """|type boolean;
        |instance boolean true, false;
        |timepoint start;
@@ -495,14 +498,11 @@ object Parser {
     """.stripMargin
 
   /** ANML model with default definitions already added */
-  val baseAnmlModel: Model = new AnmlTypeParser(Model()).parse(anmlHeader) match {
-    case Success(m, _) =>
-      new AnmlModuleParser(m).parse(anmlHeader) match {
-        case Success(m, _) => m
-        case x             => sys.error(s"could not parse the ANML header: $x")
-      }
-    case x => sys.error(s"Could not parse types the base anml model: $x")
-  }
+  val baseAnmlModel: Model =
+    parse(anmlHeader, Some(Model())) match {
+      case ParseSuccess(model) => model
+      case err: ParseFailure   => sys.error("Could not parse the ANML headed:\n" + err.format)
+    }
 
   def parse(input: String, previousModel: Option[Model] = None): ParseResult = {
     def formatFailure(failure: Failure[Char, String]): ParseFailure = {
@@ -532,7 +532,7 @@ object Parser {
   }
 
   def parseFromFile(file: File, previousModel: Option[Model] = None): ParseResult = {
-    val source = scala.io.Source.fromFile(file)
+    val source        = scala.io.Source.fromFile(file)
     var input: String = null
     try {
       input = source.getLines.mkString("\n")

@@ -101,8 +101,8 @@ package object model {
     override def toString: String = id.toString
   }
   case class TypeDeclaration(typ: Type) extends Declaration[Type] with ModuleElem {
-    override def id = typ.id
-    override def toString = s"type $id" + {
+    override def id: Id = typ.id
+    override def toString: String = s"type $id" + {
       if (typ.parent.isDefined) " < " + typ.parent.get else ""
     }
   }
@@ -120,7 +120,7 @@ package object model {
   case class FunctionDeclaration(func: FunctionTemplate)
       extends Declaration[FunctionTemplate]
       with ModuleElem {
-    override def id = func.id
+    override def id: Id = func.id
     override def toString: String = {
       val paramsString = "(" + func.params.map(p => s"${p.typ} ${p.id.name}").mkString(", ") + ")"
       func match {
@@ -202,13 +202,13 @@ package object model {
 
   /*** Time ***/
   case class Delay(from: TPRef, to: TPRef) {
-    def <=(dur: Int)  = to <= from + dur
-    def <(dur: Int)   = to < from + dur
-    def >=(dur: Int)  = to >= from + dur
-    def >(dur: Int)   = to > from + dur
-    def +(time: Int)  = Delay(from, to + time)
-    def -(time: Int)  = Delay(from, to - time)
-    def ===(dur: Int) = Seq(this <= dur, this >= dur)
+    def <=(dur: Int): TBefore       = to <= from + dur
+    def <(dur: Int): TBefore        = to < from + dur
+    def >=(dur: Int): TBefore       = to >= from + dur
+    def >(dur: Int): TBefore        = to > from + dur
+    def +(time: Int): Delay         = Delay(from, to + time)
+    def -(time: Int): Delay         = Delay(from, to - time)
+    def ===(dur: Int): Seq[TBefore] = Seq(this <= dur, this >= dur)
   }
 
   /** A timepoint, declared when appearing in the root of a context.*/
@@ -224,11 +224,11 @@ package object model {
     def +(delay: Int) = TPRef(id, this.delay + delay)
     def -(delay: Int) = TPRef(id, this.delay - delay)
 
-    def <=(other: TPRef)  = TBefore(this, other)
-    def <(other: TPRef)   = TBefore(this, other - 1)
-    def >=(other: TPRef)  = other <= this
-    def >(other: TPRef)   = other < this
-    def ===(other: TPRef) = Seq(this <= other, this >= other)
+    def <=(other: TPRef): TBefore       = TBefore(this, other)
+    def <(other: TPRef): TBefore        = TBefore(this, other - 1)
+    def >=(other: TPRef): TBefore       = other <= this
+    def >(other: TPRef): TBefore        = other < this
+    def ===(other: TPRef): Seq[TBefore] = Seq(this <= other, this >= other)
 
     def -(other: TPRef) = Delay(other, this)
   }
@@ -382,7 +382,7 @@ package object model {
       elems.foldLeft(Option(this))((m, elem) => m.flatMap(_ + elem))
     }
 
-    override def toString =
+    override def toString: String =
       "module:\n" +
         store.elems
           .filter(!Parser.baseAnmlModel.store.elems.contains(_))
