@@ -5,7 +5,7 @@ import java.io.File
 import copla.constraints.meta.search.TreeSearch
 import copla.constraints.meta.{CSP, Configuration}
 import copla.lang.model.Model
-import copla.lang.parsing.anml.Parser
+import copla.lang.parsing.anml.{GenFailure, ParseSuccess, Parser}
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
 
@@ -13,8 +13,8 @@ case class Config(file: File = new File("."))
 
 object Planner extends App {
 
-  val parser = new scopt.OptionParser[Config]("lcp") {
-    head("lcp")
+  val parser = new scopt.OptionParser[Config]("copla") {
+    head("copla")
 
     arg[File]("anml-problem-file")
       .action((x, c) => c.copy(file = x))
@@ -43,7 +43,11 @@ object Planner extends App {
 object Utils {
 
   def problem(anmlProblemFile: File): Problem = {
-    new Problem(Model()) // todo: actually parse the file
+    Parser.parse(anmlProblemFile) match {
+      case ParseSuccess(m) =>
+        new Problem(m)
+      case fail: GenFailure => throw new RuntimeException(fail.format)
+    }
   }
 
   def csp(pb: Problem) : CSP = {
