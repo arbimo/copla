@@ -2,10 +2,12 @@ package copla.planning
 
 import java.io.File
 
-import copla.anml.model.AnmlProblem
 import copla.constraints.meta.search.TreeSearch
 import copla.constraints.meta.{CSP, Configuration}
+import copla.lang.model.Model
+import copla.lang.parsing.anml.Parser
 import copla.planning.events.{InitPlanner, PlanningHandler}
+import copla.planning.model.Problem
 
 case class Config(file: File = new File("."))
 
@@ -40,13 +42,11 @@ object Planner extends App {
 
 object Utils {
 
-  def problem(anmlProblemFile: File): AnmlProblem = {
-    val pb = new AnmlProblem
-    pb.extendWithAnmlFile(anmlProblemFile.getAbsolutePath)
-    pb
+  def problem(anmlProblemFile: File): Problem = {
+    new Problem(Model()) // todo: actually parse the file
   }
 
-  def csp(pb: AnmlProblem) : CSP = {
+  def csp(pb: Problem) : CSP = {
     val csp = new CSP(Left(new Configuration(enforceTpAfterStart = false)))
     csp.addHandler(new PlanningHandler(csp, Left(pb)))
     csp.addEvent(InitPlanner)
