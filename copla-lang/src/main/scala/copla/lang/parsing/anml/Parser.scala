@@ -394,7 +394,7 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
 
   val action: Parser[ActionTemplate] = new AnmlActionParser(this).parser
 
-  val elem: Parser[Seq[ModuleElem]] =
+  val elem: Parser[Seq[InModuleBlock]] =
     inTypeFunctionDeclaration |
       instancesDeclaration |
       functionDeclaration.map(Seq(_)) |
@@ -433,7 +433,7 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
       case m: Model => m
       case _        => sys.error("Starting to parse an action while the context is not a model.")
     }
-    val emptyAct = new ActionTemplate(actionName, container, new ElemStore())
+    val emptyAct = new ActionTemplate(actionName, container, new BlockStore())
     emptyAct +
       TimepointDeclaration(TPRef(Id(emptyAct.scope, "start"))) +
       TimepointDeclaration(TPRef(Id(emptyAct.scope, "end")))

@@ -11,24 +11,24 @@ package object model {
   private[this] var nextID = 0
   def defaultId(): String  = reservedPrefix + { nextID += 1; nextID - 1 }
 
-  trait Elem
-  trait ModuleElem extends Elem
-  trait ActionElem extends Elem
-  trait Statement  extends ModuleElem with ActionElem
+  trait Block
+  trait InModuleBlock extends Block
+  trait InActionBlock extends Block
+  trait Statement  extends InModuleBlock with InActionBlock
 
-  /** An elem wrapping otehr elems pertaining to the same scope. */
-  trait Wrapper extends Elem {
-    def wrapped: Seq[Elem]
+  /** A block wrapping other blocks pertaining to the same scope. */
+  trait Wrapper extends Block {
+    def wrapped: Seq[Block]
   }
 
-  trait SymExpr extends Elem {
+  trait SymExpr extends Block {
     def typ: Type
   }
   trait TimedSymExpr  extends SymExpr
   trait StaticSymExpr extends SymExpr
 
-  abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx with ModuleElem {
-    override val store: ElemStore = new ElemStore() +
+  abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx with InModuleBlock {
+    override val store: BlockStore = new BlockStore() +
       TimepointDeclaration(TPRef(this.id("start"))) +
       TimepointDeclaration(TPRef(this.id("end")))
   }
@@ -64,15 +64,15 @@ package object model {
   }
 
   case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion)
-      extends ModuleElem
-      with ActionElem
+      extends InModuleBlock
+      with InActionBlock
       with Wrapper {
 
     override def wrapped  = Seq(assertion)
     override def toString = s"$interval $assertion"
   }
 
-  trait StaticAssertion extends ModuleElem with ActionElem
+  trait StaticAssertion extends InModuleBlock with InActionBlock
   case class StaticEqualAssertion(left: StaticSymExpr, right: StaticSymExpr)
       extends StaticAssertion {
     override def toString: String = s"$left == $right"
@@ -100,7 +100,7 @@ package object model {
 
     override def toString: String = id.toString
   }
-  case class TypeDeclaration(typ: Type) extends Declaration[Type] with ModuleElem {
+  case class TypeDeclaration(typ: Type) extends Declaration[Type] with InModuleBlock {
     override def id: Id = typ.id
     override def toString: String = s"type $id" + {
       if (typ.parent.isDefined) " < " + typ.parent.get else ""
@@ -119,7 +119,7 @@ package object model {
   }
   case class FunctionDeclaration(func: FunctionTemplate)
       extends Declaration[FunctionTemplate]
-      with ModuleElem {
+      with InModuleBlock {
     override def id: Id = func.id
     override def toString: String = {
       val paramsString = "(" + func.params.map(p => s"${p.typ} ${p.id.name}").mkString(", ") + ")"
@@ -176,7 +176,7 @@ package object model {
   case class LocalVar(id: Id, typ: Type) extends Var
   case class LocalVarDeclaration(variable: LocalVar)
       extends VarDeclaration[LocalVar]
-      with ModuleElem {
+      with InModuleBlock {
     override def toString: String = s"constant ${variable.typ} ${variable.id}"
   }
 
@@ -186,7 +186,7 @@ package object model {
   }
   case class InstanceDeclaration(instance: Instance)
       extends VarDeclaration[Instance]
-      with ModuleElem {
+      with InModuleBlock {
     override def variable: Instance = instance
     override def toString: String   = s"instance ${instance.typ} ${instance.id}"
   }
@@ -195,7 +195,7 @@ package object model {
   case class Arg(id: Id, typ: Type) extends Var {
     override def toString: String = id.toString
   }
-  case class ArgDeclaration(arg: Arg) extends VarDeclaration[Arg] with ActionElem {
+  case class ArgDeclaration(arg: Arg) extends VarDeclaration[Arg] with InActionBlock {
     override def variable: Arg    = arg
     override def toString: String = s"${arg.typ.id} ${arg.id}"
   }
@@ -234,8 +234,8 @@ package object model {
   }
   case class TimepointDeclaration(tp: TPRef)
       extends Declaration[TPRef]
-      with ModuleElem
-      with ActionElem {
+      with InModuleBlock
+      with InActionBlock {
     require(tp.delay == 0, "Cannot declare a relative timepoint.")
     override def id: Id           = tp.id
     override def toString: String = s"timepoint $id"
@@ -263,43 +263,43 @@ package object model {
 
   class ActionTemplate(override val name: String,
                        val containingModel: Model,
-                       override val store: ElemStore)
+                       override val store: BlockStore)
       extends Ctx
-      with ModuleElem {
+      with InModuleBlock {
     override def parent: Option[Ctx] = Some(containingModel)
 
-    def +(elem: ActionElem): ActionTemplate =
-      new ActionTemplate(name, containingModel, store + elem)
-    def ++(newElems: Seq[ActionElem]): ActionTemplate = newElems.headOption match {
-      case Some(first) => (this + first) ++ newElems.tail
+    def +(block: InActionBlock): ActionTemplate =
+      new ActionTemplate(name, containingModel, store + block)
+    def ++(newBlocks: Seq[InActionBlock]): ActionTemplate = newBlocks.headOption match {
+      case Some(first) => (this + first) ++ newBlocks.tail
       case None        => this
     }
 
     override def toString: String =
-      s"action $name(${store.elems.collect { case ArgDeclaration(Arg(id, typ)) => s"$typ ${id.name}" }.mkString(", ")}) {\n" +
-        store.elems.map("    " + _.toString).mkString("\n") +
+      s"action $name(${store.blocks.collect { case ArgDeclaration(Arg(id, typ)) => s"$typ ${id.name}" }.mkString(", ")}) {\n" +
+        store.blocks.map("    " + _.toString).mkString("\n") +
         "  };"
   }
 
-  class ElemStore private (val elems: Vector[Elem], val declarations: Map[Id, Declaration[_]]) {
+  class BlockStore private(val blocks: Vector[Block], val declarations: Map[Id, Declaration[_]]) {
 
     def this() = this(Vector(), Map())
 
-    def +(e: Elem): ElemStore = {
-      val newElems = elems :+ e
-      val toProcess = (e match {
+    def +(b: Block): BlockStore = {
+      val newBlocks = blocks :+ b
+      val toProcess = (b match {
         case wrapper: Wrapper =>
           wrapper +: wrapper.wrapped
         case x => Seq(x)
       }).flatMap {
-        case ctx: Ctx => ctx.store.elems :+ ctx
+        case ctx: Ctx => ctx.store.blocks :+ ctx
         case x        => Seq(x)
       }
       val newDeclarations = declarations ++ toProcess.collect {
         case x: Declaration[_] => (x.id, x)
       }
 
-      new ElemStore(newElems, newDeclarations)
+      new BlockStore(newBlocks, newDeclarations)
     }
   }
 
@@ -316,7 +316,7 @@ package object model {
       case Some(p) => p.root
       case None    => this
     }
-    def store: ElemStore
+    def store: BlockStore
 
     def findDeclaration(localID: String): Option[Declaration[_]] = {
       (localID.split("\\.").toList match {
@@ -370,22 +370,22 @@ package object model {
 
   }
 
-  case class Model(store: ElemStore = new ElemStore()) extends Ctx {
+  case class Model(store: BlockStore = new BlockStore()) extends Ctx {
     override def parent = None
     override def name   = "_module_"
 
-    def +(elem: ModuleElem): Option[Model] = {
-      Some(Model(store + elem))
+    def +(block: InModuleBlock): Option[Model] = {
+      Some(Model(store + block))
     }
 
-    def ++(elems: Seq[ModuleElem]): Option[Model] = {
-      elems.foldLeft(Option(this))((m, elem) => m.flatMap(_ + elem))
+    def ++(blocks: Seq[InModuleBlock]): Option[Model] = {
+      blocks.foldLeft(Option(this))((m, block) => m.flatMap(_ + block))
     }
 
     override def toString: String =
       "module:\n" +
-        store.elems
-          .filter(!Parser.baseAnmlModel.store.elems.contains(_))
+        store.blocks
+          .filter(!Parser.baseAnmlModel.store.blocks.contains(_))
           .map("  " + _)
           .mkString("\n")
   }
