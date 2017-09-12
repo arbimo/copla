@@ -11,21 +11,21 @@ package object model {
   private[this] var nextID = 0
   def defaultId(): String  = reservedPrefix + { nextID += 1; nextID - 1 }
 
-  trait Block
-  trait InModuleBlock extends Block
-  trait InActionBlock extends Block
-  trait Statement  extends InModuleBlock with InActionBlock
+  sealed trait Block
+  sealed trait InModuleBlock extends Block
+  sealed trait InActionBlock extends Block
+  sealed trait Statement     extends InModuleBlock with InActionBlock
 
   /** A block wrapping other blocks pertaining to the same scope. */
-  trait Wrapper extends Block {
+  sealed trait Wrapper extends Block {
     def wrapped: Seq[Block]
   }
 
-  trait SymExpr extends Block {
+  sealed trait SymExpr extends Block {
     def typ: Type
   }
-  trait TimedSymExpr  extends SymExpr
-  trait StaticSymExpr extends SymExpr
+  sealed trait TimedSymExpr  extends SymExpr
+  sealed trait StaticSymExpr extends SymExpr
 
   abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx with InModuleBlock {
     override val store: BlockStore = new BlockStore() +
@@ -72,7 +72,7 @@ package object model {
     override def toString = s"$interval $assertion"
   }
 
-  trait StaticAssertion extends InModuleBlock with InActionBlock
+  sealed trait StaticAssertion extends InModuleBlock with InActionBlock
   case class StaticEqualAssertion(left: StaticSymExpr, right: StaticSymExpr)
       extends StaticAssertion {
     override def toString: String = s"$left == $right"
@@ -86,7 +86,7 @@ package object model {
     override def toString: String = s"$left := $right"
   }
 
-  trait Declaration[T] {
+  sealed trait Declaration[T] {
     def id: Id
   }
 
@@ -114,9 +114,9 @@ package object model {
   }
 
   case class FluentTemplate(id: Id, typ: Type, params: Seq[Arg]) extends FunctionTemplate {
-
     override def toString: String = id.toString
   }
+
   case class FunctionDeclaration(func: FunctionTemplate)
       extends Declaration[FunctionTemplate]
       with InModuleBlock {
@@ -143,7 +143,6 @@ package object model {
   }
 
   case class ConstantTemplate(id: Id, typ: Type, params: Seq[Arg]) extends FunctionTemplate {
-
     override def toString: String = id.toString
   }
 
@@ -160,14 +159,15 @@ package object model {
     override def toString: String = s"$template(${params.mkString(", ")})"
   }
 
-  trait Var extends StaticSymExpr {
+  sealed trait Var extends StaticSymExpr {
     def id: Id
     def typ: Type
   }
   object Var {
     def unapply(v: Var) = Option(v.id, v.typ)
   }
-  trait VarDeclaration[V <: Var] extends Declaration[Var] {
+
+  sealed trait VarDeclaration[V <: Var] extends Declaration[Var] {
     def variable: Var
     def id: Id = variable.id
   }
@@ -276,12 +276,14 @@ package object model {
     }
 
     override def toString: String =
-      s"action $name(${store.blocks.collect { case ArgDeclaration(Arg(id, typ)) => s"$typ ${id.name}" }.mkString(", ")}) {\n" +
+      s"action $name(${store.blocks
+        .collect { case ArgDeclaration(Arg(id, typ)) => s"$typ ${id.name}" }
+        .mkString(", ")}) {\n" +
         store.blocks.map("    " + _.toString).mkString("\n") +
         "  };"
   }
 
-  class BlockStore private(val blocks: Vector[Block], val declarations: Map[Id, Declaration[_]]) {
+  class BlockStore private (val blocks: Vector[Block], val declarations: Map[Id, Declaration[_]]) {
 
     def this() = this(Vector(), Map())
 
