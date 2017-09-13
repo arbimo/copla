@@ -8,10 +8,12 @@ import ParserApi.baseApi.Parsed.Success
 import ParserApi.whiteApi._
 import ParserApi.extendedApi._
 import fastparse.core.Parsed.Failure
+import copla.lang.model.full._
 
 import scala.util.Try
 
 abstract class AnmlParser(val initialContext: Ctx) {
+
 
   /** Denotes the current context of this AnmlParser.
     * It is used by many suparsers to find the variable/fluent/type associated to an identifier.
@@ -202,17 +204,17 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
     (fluent ~/ Pass).flatMap(f =>
       f.params.map(param => param.typ) match {
-        case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq()))
+        case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(new Fluent(f, Seq()))
         case paramTypes =>
-          "(" ~/ varList(paramTypes, ",").map(args => Fluent(f, args)) ~ ")" ~/ Pass
+          "(" ~/ varList(paramTypes, ",").map(args => new Fluent(f, args)) ~ ")" ~/ Pass
     }) |
       (partiallyAppliedFluent ~/ Pass).flatMap {
         case (f, firstArg) =>
           f.params.map(param => param.typ) match {
-            case Seq(singleParam) => (("(" ~/ ")") | Pass) ~ PassWith(Fluent(f, Seq(firstArg)))
+            case Seq(singleParam) => (("(" ~/ ")") | Pass) ~ PassWith(new Fluent(f, Seq(firstArg)))
             case paramTypes =>
               "(" ~/ varList(paramTypes.tail, ",")
-                .map(args => Fluent(f, firstArg +: args)) ~ ")" ~/ Pass
+                .map(args => new Fluent(f, firstArg +: args)) ~ ")" ~/ Pass
           }
       }
   }
@@ -225,17 +227,17 @@ abstract class AnmlParser(val initialContext: Ctx) {
     variable |
       (constantFunc ~/ Pass).flatMap(f =>
         f.params.map(param => param.typ) match {
-          case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(Constant(f, Seq()))
+          case Seq() => (("(" ~/ ")") | Pass) ~ PassWith(new Constant(f, Seq()))
           case paramTypes =>
-            "(" ~/ varList(paramTypes, ",").map(args => Constant(f, args)) ~ ")" ~/ Pass
+            "(" ~/ varList(paramTypes, ",").map(args => new Constant(f, args)) ~ ")" ~/ Pass
       }) |
       (partiallyAppliedConstant ~/ Pass).flatMap {
         case (f, firstArg) =>
           f.params.map(param => param.typ) match {
-            case Seq(singleParam) => (("(" ~/ ")") | Pass) ~ PassWith(Constant(f, Seq(firstArg)))
+            case Seq(singleParam) => (("(" ~/ ")") | Pass) ~ PassWith(new Constant(f, Seq(firstArg)))
             case paramTypes =>
               "(" ~/ varList(paramTypes.tail, ",")
-                .map(args => Constant(f, firstArg +: args)) ~ ")" ~/ Pass
+                .map(args => new Constant(f, firstArg +: args)) ~ ")" ~/ Pass
           }
       }
   }
@@ -291,7 +293,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .map { case (it, assertions) => assertions.map(TemporallyQualifiedAssertion(it, _)) }
   }
 
-  val staticAssertion: Parser[StaticAssertion] = {
+  val staticAssertion: Parser[StaticAssertion[StaticSymExpr]] = {
     var leftExpr: StaticSymExpr = null
     (staticSymExpr.sideEffect(leftExpr = _) ~/
       (("==" | "!=" | ":=").! ~/
@@ -302,10 +304,10 @@ abstract class AnmlParser(val initialContext: Ctx) {
         case (expr, None) => expr.typ.id.name == "boolean"
       }, "boolean-if-no-right-side")
       .map {
-        case (left, Some(("==", right))) => StaticEqualAssertion(left, right)
-        case (left, Some(("!=", right))) => StaticDifferentAssertion(left, right)
-        case (left, Some((":=", right))) => StaticAssignmentAssertion(left, right)
-        case (expr, None)                => StaticEqualAssertion(expr, ctx.findVariable("true").get)
+        case (left, Some(("==", right))) => new StaticEqualAssertion(left, right)
+        case (left, Some(("!=", right))) => new StaticDifferentAssertion(left, right)
+        case (left, Some((":=", right))) => new StaticAssignmentAssertion(left, right)
+        case (expr, None)                => new StaticEqualAssertion(expr, ctx.findVariable("true").get)
         case _                           => sys.error("Something is wrong with this parser.")
       }
   }
@@ -433,7 +435,7 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
       case m: Model => m
       case _        => sys.error("Starting to parse an action while the context is not a model.")
     }
-    val emptyAct = new ActionTemplate(actionName, container, new BlockStore())
+    val emptyAct = new ActionTemplate(actionName, container)
     emptyAct +
       TimepointDeclaration(TPRef(Id(emptyAct.scope, "start"))) +
       TimepointDeclaration(TPRef(Id(emptyAct.scope, "end")))
@@ -501,7 +503,7 @@ object Parser {
 
   /** ANML model with default definitions already added */
   val baseAnmlModel: Model =
-    parse(anmlHeader, Some(Model())) match {
+    parse(anmlHeader, Some(new Model())) match {
       case ParseSuccess(model) => model
       case err: ParseFailure   => sys.error("Could not parse the ANML headed:\n" + err.format)
     }

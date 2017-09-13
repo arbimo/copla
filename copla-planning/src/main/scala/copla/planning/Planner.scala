@@ -4,7 +4,6 @@ import java.io.File
 
 import copla.constraints.meta.search.TreeSearch
 import copla.constraints.meta.{CSP, Configuration}
-import copla.lang.model.Model
 import copla.lang.parsing.anml.{GenFailure, ParseSuccess, Parser}
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
