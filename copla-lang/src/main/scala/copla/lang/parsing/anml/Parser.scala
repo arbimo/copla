@@ -1,6 +1,6 @@
 package copla.lang.parsing.anml
 
-import java.io.{File, FileNotFoundException, IOException}
+import java.io.{File, IOException}
 
 import copla.lang.model._
 import ParserApi.baseApi._
@@ -13,7 +13,6 @@ import copla.lang.model.full._
 import scala.util.Try
 
 abstract class AnmlParser(val initialContext: Ctx) {
-
 
   /** Denotes the current context of this AnmlParser.
     * It is used by many suparsers to find the variable/fluent/type associated to an identifier.
@@ -63,7 +62,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
   val timepointDeclaration: Parser[TimepointDeclaration] =
     timepointKW ~/
-      freeIdent.map(name => TimepointDeclaration(TPRef(ctx.id(name)))) ~
+      freeIdent.map(name => new TimepointDeclaration(new TPRef(ctx.id(name)))) ~
       ";"
 
   protected val definedTP: Parser[TPRef] =
@@ -92,7 +91,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
           ctx
             .findTimepoint("start")
             .flatMap(st => ctx.findTimepoint("end").map(ed => (st, ed))) match {
-            case Some((st, ed)) => PassWith(Delay(st, ed + 1))
+            case Some((st, ed)) => PassWith(new Delay(st, ed + 1))
             case None           => sys.error("No start/end timepoint"); Fail
         })
       .opaque("duration") |
@@ -234,7 +233,8 @@ abstract class AnmlParser(val initialContext: Ctx) {
       (partiallyAppliedConstant ~/ Pass).flatMap {
         case (f, firstArg) =>
           f.params.map(param => param.typ) match {
-            case Seq(singleParam) => (("(" ~/ ")") | Pass) ~ PassWith(new Constant(f, Seq(firstArg)))
+            case Seq(singleParam) =>
+              (("(" ~/ ")") | Pass) ~ PassWith(new Constant(f, Seq(firstArg)))
             case paramTypes =>
               "(" ~/ varList(paramTypes.tail, ",")
                 .map(args => new Constant(f, firstArg +: args)) ~ ")" ~/ Pass
@@ -258,7 +258,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
           }
         })) ~
       "]").map {
-      case (tp1, tp2) => Interval(tp1, tp2)
+      case (tp1, tp2) => new Interval(tp1, tp2)
     }
 
   val timedAssertion: Parser[TimedAssertion] = {
@@ -330,8 +330,10 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
             | Pass ~ term ~ PassWith(previous :+ name))
 
     (instanceKW ~/ declaredType ~/ distinctFreeIdents(Nil, ",", ";"))
-      .map { case (typ, instanceNames) => instanceNames.map(name => Instance(ctx.id(name), typ)) }
-  }.map(instances => instances.map(InstanceDeclaration(_)))
+      .map {
+        case (typ, instanceNames) => instanceNames.map(name => new Instance(ctx.id(name), typ))
+      }
+  }.map(instances => instances.map(new InstanceDeclaration(_)))
 
   /** Parser that to read the kind and type of a function declaration. For instance:
     * "fluent T", "constant T", "function T", "variable T", "predicate" where T is a type already declared.
@@ -355,16 +357,16 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
     (functionKindAndType ~ freeIdent ~ argList ~ ";")
       .map {
         case ("fluent", typ, svName, args) =>
-          FluentTemplate(ctx.id(svName), typ, args.map {
-            case (name, argType) => Arg(Id(ctx.scope + svName, name), argType)
+          new FluentTemplate(ctx.id(svName), typ, args.map {
+            case (name, argType) => new Arg(new Id(ctx.scope + svName, name), argType)
           })
         case ("constant", typ, svName, args) =>
-          ConstantTemplate(ctx.id(svName), typ, args.map {
-            case (name, argType) => Arg(Id(ctx.scope + svName, name), argType)
+          new ConstantTemplate(ctx.id(svName), typ, args.map {
+            case (name, argType) => new Arg(new Id(ctx.scope + svName, name), argType)
           })
         case _ => sys.error("Match failed")
       }
-      .map(FunctionDeclaration(_))
+      .map(new FunctionDeclaration(_))
   }
 
   /** Extract the functions declared in a type. This consumes the whole type declaration.
@@ -381,16 +383,16 @@ class AnmlModuleParser(val initialModel: Model) extends AnmlParser(initialModel)
         case (_, _, None) => Seq()
         case (t, _, Some(funcDecl)) =>
           funcDecl.map(fd => {
-            val id            = Id(t.asScope, fd.id.name)
+            val id            = new Id(t.asScope, fd.id.name)
             val functionScope = t.asScope + id.name
-            val selfArg       = Arg(Id(functionScope, "self"), t)
+            val selfArg       = new Arg(new Id(functionScope, "self"), t)
             val params = selfArg +: fd.func.params.map(arg =>
-              Arg(Id(functionScope, arg.id.name), arg.typ))
+              new Arg(new Id(functionScope, arg.id.name), arg.typ))
             val template = fd.func match {
-              case _: FluentTemplate   => FluentTemplate(id, fd.func.typ, params)
-              case _: ConstantTemplate => ConstantTemplate(id, fd.func.typ, params)
+              case _: FluentTemplate   => new FluentTemplate(id, fd.func.typ, params)
+              case _: ConstantTemplate => new ConstantTemplate(id, fd.func.typ, params)
             }
-            FunctionDeclaration(template)
+            new FunctionDeclaration(template)
           })
       }
 
@@ -437,8 +439,8 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
     }
     val emptyAct = new ActionTemplate(actionName, container)
     emptyAct +
-      TimepointDeclaration(TPRef(Id(emptyAct.scope, "start"))) +
-      TimepointDeclaration(TPRef(Id(emptyAct.scope, "end")))
+      new TimepointDeclaration(new TPRef(new Id(emptyAct.scope, "start"))) +
+      new TimepointDeclaration(new TPRef(new Id(emptyAct.scope, "end")))
   }
 
   val parser: Parser[ActionTemplate] =
@@ -452,7 +454,7 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
       }) ~/
       argList // parse arguments and update the current action
         .map(_.map {
-          case (name, typ) => ArgDeclaration(Arg(Id(ctx.scope, name), typ))
+          case (name, typ) => new ArgDeclaration(new Arg(new Id(ctx.scope, name), typ))
         })
         .sideEffect(argDeclarations => updateContext(currentAction ++ argDeclarations)) ~
       "{" ~/
@@ -473,7 +475,7 @@ class AnmlTypeParser(val initialModel: Model) extends AnmlParser(initialModel) {
     (word | int | CharIn("{}[]();=:<>-+.,!/*")).!.namedFilter(_ != "type", "non-type-token")
   val typeDeclaration: Parser[TypeDeclaration] =
     (typeKW ~/ freeIdent ~ ("<" ~ declaredType).? ~ (";" | withKW)).map {
-      case (name, parentOpt) => TypeDeclaration(Type(ctx.id(name), parentOpt))
+      case (name, parentOpt) => new TypeDeclaration(new Type(ctx.id(name), parentOpt))
     }
 
   private[this] def currentModel: Model = ctx match {
@@ -532,7 +534,7 @@ object Parser {
       new AnmlTypeParser(previousModel.getOrElse(baseAnmlModel)).parse(input) match {
         case Success(modelWithTypes, _) =>
           new AnmlModuleParser(modelWithTypes).parse(input) match {
-            case Success(fullModel, _) => ParseSuccess(fullModel)
+            case Success(fullModel, _)    => ParseSuccess(fullModel)
             case x: Failure[Char, String] => formatFailure(x)
           }
         case x: Failure[Char, String] => formatFailure(x)
@@ -545,7 +547,7 @@ object Parser {
 
   private def parseFromFile(file: File, previousModel: Option[Model] = None): ParseResult = {
     Try {
-      val source = scala.io.Source.fromFile(file)
+      val source        = scala.io.Source.fromFile(file)
       val input: String = source.getLines.mkString("\n")
       source.close()
       parse(input, previousModel) match {
@@ -567,15 +569,16 @@ object Parser {
     **/
   def parse(file: File): ParseResult = {
     file.getName.split('.') match {
-        case Array(domId, pbId, "pb", "anml") =>
-          // file name formated as domainID.pbID.pb.anml, load domainID.dom.anml first
-          val domainFile = new File(file.getParentFile, domId + ".dom.anml")
-          Parser.parseFromFile(domainFile)
-            .flatMap(domainModel => parseFromFile(file, Some(domainModel)))
-        case _ =>
-          // not a problem file, load the file standalone
-          Parser.parseFromFile(file)
-      }
+      case Array(domId, pbId, "pb", "anml") =>
+        // file name formated as domainID.pbID.pb.anml, load domainID.dom.anml first
+        val domainFile = new File(file.getParentFile, domId + ".dom.anml")
+        Parser
+          .parseFromFile(domainFile)
+          .flatMap(domainModel => parseFromFile(file, Some(domainModel)))
+      case _ =>
+        // not a problem file, load the file standalone
+        Parser.parseFromFile(file)
+    }
   }
 }
 
@@ -590,10 +593,12 @@ trait GenFailure extends ParseResult {
   override def flatMap(f: Model => ParseResult): ParseResult = this
 }
 case class FileAccessError(file: File, throwable: Throwable) extends GenFailure {
-  override def format: String = s"Error while trying to read: $file:\n" + throwable.getLocalizedMessage
+  override def format: String =
+    s"Error while trying to read: $file:\n" + throwable.getLocalizedMessage
 }
 case class UnidentifiedError(throwable: Throwable, file: Option[File]) extends GenFailure {
-  def format: String = s"Error while processing ANML input${file.map(" ["+_+"]").getOrElse("")}:\n" + throwable.getLocalizedMessage
+  def format: String =
+    s"Error while processing ANML input${file.map(" [" + _ + "]").getOrElse("")}:\n" + throwable.getLocalizedMessage
 }
 case class ParseFailure(faultyLine: String,
                         lineIndex: Int,
