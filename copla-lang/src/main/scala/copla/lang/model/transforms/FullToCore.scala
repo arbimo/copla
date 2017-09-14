@@ -116,7 +116,7 @@ object FullToCore {
       }
   }
 
-  def trans(model: full.Model, config: Config): Seq[core.InModuleBlock] = {
+  def trans(model: full.Model, config: Config = Config()): Seq[core.InModuleBlock] = {
 
     model.store.blocks.flatMap {
       case x: core.InModuleBlock  => Seq(x)

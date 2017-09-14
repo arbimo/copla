@@ -4,9 +4,13 @@ import java.io.File
 
 import copla.constraints.meta.search.TreeSearch
 import copla.constraints.meta.{CSP, Configuration}
+import copla.lang.model.transforms.FullToCore
 import copla.lang.parsing.anml.{GenFailure, ParseSuccess, Parser}
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
+
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 case class Config(file: File = new File("."))
 
@@ -44,7 +48,14 @@ object Utils {
   def problem(anmlProblemFile: File): Problem = {
     Parser.parse(anmlProblemFile) match {
       case ParseSuccess(m) =>
-        new Problem(m)
+        Try {
+          new Problem(FullToCore.trans(m))
+        } match {
+          case Success(pb) => pb
+          case Failure(NonFatal(e)) =>
+            e.printStackTrace()
+            sys.error("Error while converting the ANML model: "+e.getLocalizedMessage)
+        }
       case fail: GenFailure => throw new RuntimeException(fail.format)
     }
   }
