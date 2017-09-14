@@ -6,14 +6,16 @@ import copla.lang.model.full.Scope
 
 object FullToCore {
 
+  case class Context(scope: Scope, config: Config = Config())
+
   private def staticExprToVar(expr: full.StaticSymExpr)(
-      implicit scope: Scope): (core.Var, Seq[core.Statement]) = {
+      implicit ctx: Context): (core.Var, Seq[core.Statement]) = {
     expr match {
       case x: core.Var => (x, Seq())
       case x: full.Constant =>
         val (params, statements) = staticExprsToVars(x.params)
         val cst                  = core.Constant(x.template, params)
-        val variable             = core.LocalVar(scope.makeNewId(), cst.typ)
+        val variable             = core.LocalVar(ctx.scope.makeNewId(), cst.typ)
         val declaration          = core.LocalVarDeclaration(variable)
         val eq                   = core.BindAssertion(cst, variable)
         (variable, statements :+ eq :+ declaration)
@@ -21,7 +23,7 @@ object FullToCore {
   }
 
   private def staticExprsToVars(exprs: Seq[full.StaticSymExpr])(
-      implicit scope: Scope): (Seq[core.Var], Seq[core.Statement]) =
+      implicit ctx: Context): (Seq[core.Var], Seq[core.Statement]) =
     exprs
       .map(param => staticExprToVar(param))
       .foldLeft((Seq[core.Var](), Seq[core.Statement]())) {
@@ -30,7 +32,7 @@ object FullToCore {
       }
 
   def timedSymExpr2CoreFluent(expr: full.TimedSymExpr)(
-      implicit scope: Scope): (core.Fluent, Seq[core.Statement]) = {
+      implicit ctx: Context): (core.Fluent, Seq[core.Statement]) = {
     expr match {
       case fluent: full.Fluent =>
         val (params, statements) = staticExprsToVars(fluent.params)
@@ -38,7 +40,7 @@ object FullToCore {
     }
   }
 
-  def trans(block: full.Statement)(implicit scope: Scope): Seq[core.Statement] = block match {
+  def trans(block: full.Statement)(implicit ctx: Context): Seq[core.Statement] = block match {
     case x: core.Statement => Seq(x)
 
     case x: full.StaticAssignmentAssertion =>
@@ -64,35 +66,53 @@ object FullToCore {
       lStmts ++ rStmts :+ core.StaticEqualAssertion(lVar, rVar)
 
     case full.TemporallyQualifiedAssertion(interval, assertion) =>
-      val baseStatements: Seq[core.Statement] = Seq(Seq(core.TimepointDeclaration(assertion.start)),
-                               Seq(core.TimepointDeclaration(assertion.end)),
-                               interval.start === assertion.start,
-                               interval.end === assertion.end).flatten
+      val (start, end, baseStatements: Seq[core.Statement]) =
+        if (ctx.config.mergeTimepoints && assertion.name.startsWith(reservedPrefix)) {
+          // we are asked to merge timepoints and assertion was not given a name
+          // use the timepoints from the interval instead of the one of the assertion
+          (interval.start, interval.end, Seq())
+        } else {
+          (assertion.start,
+           assertion.end,
+           Seq(
+             Seq(core.TimepointDeclaration(assertion.start)),
+             Seq(core.TimepointDeclaration(assertion.end)),
+             interval.start === assertion.start,
+             interval.end === assertion.end
+           ).flatten)
+        }
       assertion match {
         case full.TimedEqualAssertion(fluent, value, parent, name) =>
           val (coreFluent, fluentStatement) = timedSymExpr2CoreFluent(fluent)
           val (coreValue, valueStatements)  = staticExprToVar(value)
           baseStatements ++ fluentStatement ++ valueStatements :+ core
-            .TimedEqualAssertion(assertion.start, assertion.end, coreFluent, coreValue)
+            .TimedEqualAssertion(start, end, coreFluent, coreValue) :+
+            (start <= end)
         case full.TimedAssignmentAssertion(fluent, value, parent, name) =>
           val (coreFluent, fluentStatement) = timedSymExpr2CoreFluent(fluent)
           val (coreValue, valueStatements)  = staticExprToVar(value)
           baseStatements ++ fluentStatement ++ valueStatements :+ core
-            .TimedAssignmentAssertion(assertion.start, assertion.end, coreFluent, coreValue)
+            .TimedAssignmentAssertion(start, end, coreFluent, coreValue) :+
+            (start <= end)
         case full.TimedTransitionAssertion(fluent, fromValue, toValue, parent, name) =>
-          val (coreFluent, fluentStatement) = timedSymExpr2CoreFluent(fluent)
-          val (coreFromValue, fromValueStatements)  = staticExprToVar(fromValue)
-          val (coreToValue, toValueStatements)  = staticExprToVar(toValue)
+          val (coreFluent, fluentStatement)        = timedSymExpr2CoreFluent(fluent)
+          val (coreFromValue, fromValueStatements) = staticExprToVar(fromValue)
+          val (coreToValue, toValueStatements)     = staticExprToVar(toValue)
           baseStatements ++ fluentStatement ++ fromValueStatements ++ toValueStatements :+ core
-            .TimedTransitionAssertion(assertion.start, assertion.end, coreFluent, coreFromValue, coreToValue)
+            .TimedTransitionAssertion(start,
+                                      end,
+                                      coreFluent,
+                                      coreFromValue,
+                                      coreToValue) :+
+            (start < end)
       }
   }
 
-  def trans(model: full.Model): Seq[core.InModuleBlock] = {
-    implicit val scope = model.scope
+  def trans(model: full.Model, config: Config): Seq[core.InModuleBlock] = {
+
     model.store.blocks.flatMap {
-      case x: core.InModuleBlock => Seq(x)
-      case x: full.Statement => trans(x)
+      case x: core.InModuleBlock  => Seq(x)
+      case x: full.Statement      => trans(x)(Context(model.scope, config))
       case x: full.ActionTemplate => ???
     }
 

@@ -4,9 +4,10 @@ import java.io.File
 
 import copla.lang.parsing.anml.{GenFailure, ParseFailure, ParseSuccess, Parser}
 
-object ParserApp extends App {
+case class Config(anmlFile: File = new File("."),
+                  quiet: Boolean = false)
 
-  case class Config(anmlFile: File = new File("."), quiet: Boolean = false)
+object ParserApp extends App {
 
   val optionsParser = new scopt.OptionParser[Config]("copla-lang") {
     head("""copla-lang is a set of libraries and command line utilities
@@ -25,7 +26,7 @@ object ParserApp extends App {
     case Some(conf) =>
       Parser.parse(conf.anmlFile) match {
         case ParseSuccess(model) =>
-          if(!conf.quiet)
+          if (!conf.quiet)
             println(model)
         case x: GenFailure =>
           println(x.format)
