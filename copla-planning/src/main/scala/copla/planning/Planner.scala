@@ -55,6 +55,7 @@ object Utils {
           case Failure(NonFatal(e)) =>
             e.printStackTrace()
             sys.error("Error while converting the ANML model: "+e.getLocalizedMessage)
+          case Failure(e) => throw e
         }
       case fail: GenFailure => throw new RuntimeException(fail.format)
     }

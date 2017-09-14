@@ -135,15 +135,20 @@ package object model {
 
     private type Param = Var
 
+    sealed trait Function {
+      def template: FunctionTemplate
+      def params: Seq[Var]
+    }
+
     case class Constant(override val template: ConstantTemplate, override val params: Seq[Var])
-        extends full.Constant(template, params) {
+        extends full.Constant(template, params) with Function {
       override def toString: String = super.toString
     }
     class BoundConstant(override val template: ConstantTemplate, override val params: Seq[Instance])
         extends Constant(template, params)
 
     case class Fluent(override val template: FluentTemplate, override val params: Seq[Param])
-        extends full.Fluent(template, params) {
+        extends full.Fluent(template, params) with Function {
 
       override def toString = s"$template(${params.mkString(", ")})"
     }

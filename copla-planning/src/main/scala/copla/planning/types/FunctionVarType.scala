@@ -1,8 +1,9 @@
 package copla.planning.types
 
 import copla.constraints.meta.types.statics.{BaseType, Type}
+import copla.lang.model.{core => anml}
 
-class FunctionVarType(val functions: Iterable[Any /*TODO:SymFunction*/])
-  extends BaseType[Any /*TODO:SymFunction*/]("TFunction", functions.toList.zipWithIndex) {
+class FunctionVarType(val functions: Iterable[anml.FunctionTemplate])
+  extends BaseType[anml.FunctionTemplate]("TFunction", functions.toList.zipWithIndex) {
 
 }

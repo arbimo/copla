@@ -13,87 +13,88 @@ import copla.planning.model.Problem
 import copla.planning.structures.{Change, Holds}
 import copla.planning.types.{AnmlVarType, TypeHandler}
 import copla.planning.variables.{FVar, InstanceVar, SVar, Var}
+import copla.lang.model.core
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler]) extends InternalCSPEventHandler {
+class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
+    extends InternalCSPEventHandler {
 
   implicit val csp = _csp
 
   def log = csp.log
 
-  assert1(!csp.conf.enforceTpAfterStart, "Planner needs to be able some timepoints before the CSP's temporal origin.")
+  assert1(!csp.conf.enforceTpAfterStart,
+          "Planner needs to be able some timepoints before the CSP's temporal origin.")
 
   val pb: Problem = base match {
     case Left(anmlProblem) => anmlProblem
-    case Right(prev) => prev.pb
+    case Right(prev)       => prev.pb
   }
 
-  //  val variables: mutable.Map[VarRef, Var] = base match {
-  //    case Right(prev) => prev.variables.clone()
-  //    case Left(_) => mutable.Map()
-  //  }
-  //
-  //  val stateVariables: mutable.Map[ParameterizedStateVariable, SVar] = base match {
-  //    case Right(prev) => prev.stateVariables.clone()
-  //    case Left(_) => mutable.Map()
-  //  }
+  val variables: mutable.Map[core.Var, Var] = base match {
+    case Right(prev) => prev.variables.clone()
+    case Left(_)     => mutable.Map()
+  }
 
-  //  val functionVars: mutable.Map[SymFunction, FVar] = base match {
-  //    case Left(_) => mutable.Map()
-  //    case Right(prev) => prev.functionVars.clone()
-  //  }
+  val stateVariables: mutable.Map[core.Function, SVar] = base match {
+    case Right(prev) => prev.stateVariables.clone()
+    case Left(_)     => mutable.Map()
+  }
+
+  val functionVars: mutable.Map[core.FunctionTemplate, FVar] = base match {
+    case Left(_)     => mutable.Map()
+    case Right(prev) => prev.functionVars.clone()
+  }
 
   val types: TypeHandler = base match {
-    case Left(_) => new TypeHandler(pb)
+    case Left(_)     => new TypeHandler(pb)
     case Right(prev) => prev.types
   }
 
-  //  val actions: mutable.ArrayBuffer[Action] = base match {
+  //  val actions: mutable.ArrayBuffer[Action] = base match { TODO
   //    case Right(prev) => prev.actions.clone()
   //    case Left(_) => mutable.ArrayBuffer()
   //  }
   //
-  //  val extensionDomains: mutable.Map[model.Function, ExtensionDomain] = base match {
-  //    case Right(prev) => prev.extensionDomains.clone()
-  //    case Left(_) => mutable.Map()
-  //  }
+  val extensionDomains: mutable.Map[core.ConstantTemplate, ExtensionDomain] = base match {
+    case Right(prev) => prev.extensionDomains.clone()
+    case Left(_)     => mutable.Map()
+  }
 
   // last since causal handler typically need to access types and variables
   val subhandlers: mutable.ArrayBuffer[PlanningEventHandler] = base match {
-    case Left(_) => mutable.ArrayBuffer(new CausalHandler(this))
+    case Left(_)     => mutable.ArrayBuffer(new CausalHandler(this))
     case Right(prev) => prev.subhandlers.map(_.clone(this))
   }
 
-  //  def variable(v: VarRef): Var = v match {
-  //    case v: InstanceRef =>
-  //      variables.getOrElseUpdate(v, new InstanceVar(v, types.get(v.typ)))
-  //    case _ =>
-  //      variables.getOrElseUpdate(v, new Var(v, types.get(v.typ)))
-  //  }
-
-  //  def func(f: model.Function): FVar = f match {
-  //    case f: SymFunction => functionVars.getOrElseUpdate(f, new FVar(f, types.functionType))
-  //    case _ => throw new NotImplementedError()
-  //  }
-  //
-  //  def sv(psv: ParameterizedStateVariable): SVar =
-  //    stateVariables.getOrElseUpdate(psv, new SVar(func(psv.func), psv.args.toList.map(variable(_)), psv))
-
-  def getHandler[T](clazz: Class[T]): T = subhandlers.filter(_.getClass == clazz).toList match {
-    case Nil => throw new IllegalArgumentException("No handler of such type")
-    case h :: Nil => h.asInstanceOf[T]
-    case list => throw new IllegalArgumentException("Multiple handlers of such type")
+  def variable(v: core.Var): Var = v match {
+    case v: core.Instance =>
+      variables.getOrElseUpdate(v, new InstanceVar(v, types.get(v.typ)))
+    case _ =>
+      variables.getOrElseUpdate(v, new Var(v, types.get(v.typ)))
   }
 
-  //  def tp(tpRef: TPRef): Timepoint =
-  //    if(tpRef == pb.start)
-  //      csp.temporalOrigin
-  //    else if(tpRef == pb.end)
-  //      csp.temporalHorizon
-  //    else
-  //      csp.varStore.getTimepoint(tpRef)
+  def func(f: core.FunctionTemplate): FVar =
+    functionVars.getOrElseUpdate(f, new FVar(f, types.functionType))
+
+  def sv(psv: core.Function): SVar =
+    stateVariables.getOrElseUpdate(psv, new SVar(func(psv.template), psv.params.map(variable), psv))
+
+  def getHandler[T](clazz: Class[T]): T = subhandlers.filter(_.getClass == clazz).toList match {
+    case Nil      => throw new IllegalArgumentException("No handler of such type")
+    case h :: Nil => h.asInstanceOf[T]
+    case list     => throw new IllegalArgumentException("Multiple handlers of such type")
+  }
+
+    def tp(tpRef: core.TPRef): Timepoint =
+      if(tpRef == pb.start)
+        csp.temporalOrigin
+      else if(tpRef == pb.end)
+        csp.temporalHorizon
+      else
+        csp.varStore.getTimepoint(tpRef)
 
   //  def insertChronicle(chronicle: Chronicle) {
   //    for(c <- chronicle.bindingConstraints.asScala)  c match {
