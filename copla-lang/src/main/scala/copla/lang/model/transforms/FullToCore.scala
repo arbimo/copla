@@ -18,7 +18,7 @@ object FullToCore {
         val variable             = core.LocalVar(ctx.scope.makeNewId(), cst.typ)
         val declaration          = core.LocalVarDeclaration(variable)
         val eq                   = core.BindAssertion(cst, variable)
-        (variable, statements :+ eq :+ declaration)
+        (variable, statements :+ declaration :+ eq)
     }
   }
 
@@ -60,7 +60,7 @@ object FullToCore {
           Seq(core.StaticAssignmentAssertion(boundCst, inst))
         case _ =>
           throw new UnsupportedOperationException(
-            s"Assignment assertions on constant functions are only supported when all parameters are declared instances in: $block")
+            s"Assignment assertions on constant functions are only supported when all parameters are declared instances: $block")
       }
 
     case x: full.StaticEqualAssertion =>

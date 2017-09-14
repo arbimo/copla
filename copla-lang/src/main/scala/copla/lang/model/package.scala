@@ -76,7 +76,9 @@ package object model {
     }
 
     /** Variable declared locally */
-    case class LocalVar(id: Id, typ: Type) extends Var
+    case class LocalVar(id: Id, typ: Type) extends Var {
+      override def toString: String = id.toString
+    }
     case class LocalVarDeclaration(variable: LocalVar)
         extends VarDeclaration[LocalVar]
         with Statement {
@@ -163,22 +165,30 @@ package object model {
         with StaticAssertion {
       override def toString: String = super.toString
     }
-    case class BindAssertion(constant: Constant, variable: Var) extends StaticAssertion
+    case class BindAssertion(constant: Constant, variable: Var) extends StaticAssertion {
+      override def toString: String = s"$constant == $variable"
+    }
 
     trait TimedAssertion extends Statement {
       def start: TPRef
       def end: TPRef
     }
     case class TimedEqualAssertion(start: TPRef, end: TPRef, fluent: Fluent, value: Var)
-        extends TimedAssertion
+        extends TimedAssertion {
+      override def toString: String = s"[$start, $end] $fluent == $value"
+    }
     case class TimedAssignmentAssertion(start: TPRef, end: TPRef, fluent: Fluent, value: Var)
-        extends TimedAssertion
+        extends TimedAssertion {
+      override def toString: String = s"[$start,$end] $fluent := $value"
+    }
     case class TimedTransitionAssertion(start: TPRef,
                                         end: TPRef,
                                         fluent: Fluent,
                                         from: Var,
                                         to: Var)
-        extends TimedAssertion
+        extends TimedAssertion {
+      override def toString: String = s"[$start, $end] $fluent == $start :-> $end"
+    }
 
     /*** Time ***/
     case class Delay(from: TPRef, to: TPRef) {
@@ -230,6 +240,9 @@ package object model {
 
     case class ActionTemplate(name: String, content: Seq[InActionBlock]) extends InModuleBlock {
       lazy val args: Seq[Arg] = content.collect { case ArgDeclaration(a) => a }
+
+      override def toString: String =
+        s"action $name(${args.mkString(", ")}):" + "\n  " + content.mkString("\n  ")
     }
 
   }
