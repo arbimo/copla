@@ -9,9 +9,9 @@ package object model {
   def defaultId(): String  = reservedPrefix + { nextID += 1; nextID - 1 }
 
   object core {
-    trait Block            extends full.Block with InCore
-    trait InModuleBlock    extends full.InModuleBlock with InCore
-    trait InActionBlock    extends full.InActionBlock with InCore
+    sealed trait Block            extends full.Block with InCore
+    sealed trait InModuleBlock    extends full.InModuleBlock with InCore
+    sealed trait InActionBlock    extends full.InActionBlock with InCore
     sealed trait Statement extends InModuleBlock with InActionBlock with full.Statement
 
     sealed trait InCore
@@ -226,6 +226,10 @@ package object model {
 
     case class TBefore(from: TPRef, to: TPRef) extends Statement {
       override def toString: String = s"$from <= $to"
+    }
+
+    case class ActionTemplate(name: String, content: Seq[InActionBlock]) extends InModuleBlock {
+      lazy val args: Seq[Arg] = content.collect { case ArgDeclaration(a) => a }
     }
 
   }

@@ -40,6 +40,14 @@ object FullToCore {
     }
   }
 
+  def trans(act: full.ActionTemplate)(implicit ctx: Context): core.ActionTemplate = {
+    val statements = act.store.blocks.flatMap {
+      case x: core.InActionBlock => Seq(x)
+      case x: full.Statement => trans(x)
+    }
+    core.ActionTemplate(act.name, statements)
+  }
+
   def trans(block: full.Statement)(implicit ctx: Context): Seq[core.Statement] = block match {
     case x: core.Statement => Seq(x)
 
@@ -113,7 +121,7 @@ object FullToCore {
     model.store.blocks.flatMap {
       case x: core.InModuleBlock  => Seq(x)
       case x: full.Statement      => trans(x)(Context(model.scope, config))
-      case x: full.ActionTemplate => ???
+      case x: full.ActionTemplate => Seq(trans(x)(Context(model.scope, config)))
     }
 
   }
