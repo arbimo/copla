@@ -293,7 +293,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
       .map { case (it, assertions) => assertions.map(TemporallyQualifiedAssertion(it, _)) }
   }
 
-  val staticAssertion: Parser[StaticAssertion[StaticSymExpr]] = {
+  val staticAssertion: Parser[StaticAssertion] = {
     var leftExpr: StaticSymExpr = null
     (staticSymExpr.sideEffect(leftExpr = _) ~/
       (("==" | "!=" | ":=").! ~/

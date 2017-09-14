@@ -12,7 +12,7 @@ package object model {
     trait Block            extends full.Block with InCore
     trait InModuleBlock    extends full.InModuleBlock with InCore
     trait InActionBlock    extends full.InActionBlock with InCore
-    sealed trait Statement extends InModuleBlock with InActionBlock
+    sealed trait Statement extends InModuleBlock with InActionBlock with full.Statement
 
     sealed trait InCore
 
@@ -134,35 +134,38 @@ package object model {
     private type Param = Var
 
     case class Constant(override val template: ConstantTemplate, override val params: Seq[Var])
-        extends full.Constant[Var](template, params) {
+        extends full.Constant(template, params) {
       override def toString: String = super.toString
     }
+    class BoundConstant(override val template: ConstantTemplate, override val params: Seq[Instance])
+        extends Constant(template, params)
 
     case class Fluent(override val template: FluentTemplate, override val params: Seq[Param])
-        extends full.Fluent[Param](template, params) {
+        extends full.Fluent(template, params) {
 
       override def toString = s"$template(${params.mkString(", ")})"
     }
 
-    sealed trait StaticAssertion extends full.StaticAssertion[Var] with Statement
+    sealed trait StaticAssertion extends full.StaticAssertion with Statement
     case class StaticEqualAssertion(override val left: Var, override val right: Var)
-        extends full.StaticEqualAssertion[Var](left, right)
+        extends full.StaticEqualAssertion(left, right)
         with StaticAssertion {
       override def toString: String = super.toString
     }
     case class StaticDifferentAssertion(override val left: Var, override val right: Var)
-        extends full.StaticDifferentAssertion[Var](left, right)
+        extends full.StaticDifferentAssertion(left, right)
         with StaticAssertion {
       override def toString: String = super.toString
     }
-    case class StaticAssignmentAssertion(override val left: Var, override val right: Var)
-        extends full.StaticAssignmentAssertion[Var](left, right)
+    case class StaticAssignmentAssertion(override val left: BoundConstant,
+                                         override val right: Instance)
+        extends full.StaticAssignmentAssertion(left, right)
         with StaticAssertion {
       override def toString: String = super.toString
     }
     case class BindAssertion(constant: Constant, variable: Var) extends StaticAssertion
 
-    trait TimedAssertion extends InModuleBlock with InActionBlock {
+    trait TimedAssertion extends Statement {
       def start: TPRef
       def end: TPRef
     }
@@ -211,8 +214,7 @@ package object model {
     }
     case class TimepointDeclaration(tp: TPRef)
         extends Declaration[TPRef]
-        with InModuleBlock
-        with InActionBlock {
+        with Statement {
       require(tp.delay == 0, "Cannot declare a relative timepoint.")
       override def id: Id           = tp.id
       override def toString: String = s"timepoint $id"
@@ -267,11 +269,14 @@ package object model {
     }
 
     abstract class TimedAssertion(parent: Option[Ctx], name: String)
-        extends Ctx
-        with InModuleBlock {
-      override val store: BlockStore = new BlockStore() +
-        new TimepointDeclaration(new TPRef(this.id("start"))) +
-        new TimepointDeclaration(new TPRef(this.id("end")))
+        extends Ctx with Block {
+
+      val start: TPRef = new TPRef(this.id("start"))
+      val end: TPRef   = new TPRef(this.id("end"))
+
+      override val store: BlockStore[Statement] = new BlockStore[Statement]() +
+        new TimepointDeclaration(start) +
+        new TimepointDeclaration(end)
     }
     case class TimedEqualAssertion(left: TimedSymExpr,
                                    right: StaticSymExpr,
@@ -305,29 +310,28 @@ package object model {
     }
 
     case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion)
-        extends InModuleBlock
-        with InActionBlock
+        extends Statement
         with Wrapper {
 
       override def wrapped  = Seq(assertion)
       override def toString = s"$interval $assertion"
     }
 
-    sealed trait StaticAssertion[T] extends InModuleBlock with InActionBlock
-    class StaticEqualAssertion[T <: StaticSymExpr](val left: T, val right: T)
-        extends StaticAssertion[T] {
+    sealed trait StaticAssertion extends Statement
+    class StaticEqualAssertion(val left: StaticSymExpr, val right: StaticSymExpr)
+        extends StaticAssertion {
       override def toString: String = s"$left == $right"
     }
-    class StaticDifferentAssertion[T <: StaticSymExpr](val left: T, val right: T)
-        extends StaticAssertion[T] {
+    class StaticDifferentAssertion(val left: StaticSymExpr, val right: StaticSymExpr)
+        extends StaticAssertion {
       override def toString: String = s"$left != $right"
     }
-    class StaticAssignmentAssertion[T <: StaticSymExpr](val left: T, val right: T)
-        extends StaticAssertion[T] {
+    class StaticAssignmentAssertion(val left: StaticSymExpr, val right: StaticSymExpr)
+        extends StaticAssertion {
       override def toString: String = s"$left := $right"
     }
 
-    class Fluent[T <: StaticSymExpr](val template: FluentTemplate, val params: Seq[T])
+    class Fluent(val template: FluentTemplate, val params: Seq[StaticSymExpr])
         extends TimedSymExpr {
       require(template.params.size == params.size)
       template.params.zip(params).foreach {
@@ -340,7 +344,7 @@ package object model {
       override def toString = s"$template(${params.mkString(", ")})"
     }
 
-    class Constant[T <: StaticSymExpr](val template: ConstantTemplate, val params: Seq[T])
+    class Constant(val template: ConstantTemplate, val params: Seq[StaticSymExpr])
         extends StaticSymExpr {
       require(template.params.size == params.size)
       template.params.zip(params).foreach {
@@ -355,7 +359,7 @@ package object model {
 
     class ActionTemplate(override val name: String,
                          val containingModel: Model,
-                         override val store: BlockStore = new BlockStore())
+                         override val store: BlockStore[InActionBlock] = new BlockStore())
         extends Ctx
         with InModuleBlock {
       override def parent: Option[Ctx] = Some(containingModel)
@@ -375,7 +379,7 @@ package object model {
           "  };"
     }
 
-    case class Model(store: BlockStore = new BlockStore()) extends Ctx {
+    case class Model(store: BlockStore[InModuleBlock] = new BlockStore()) extends Ctx {
       override def parent = None
       override def name   = "_module_"
 
@@ -395,12 +399,12 @@ package object model {
             .mkString("\n")
     }
 
-    class BlockStore private (val blocks: Vector[Block],
+    class BlockStore[+T <: Block] private (val blocks: Vector[T],
                               val declarations: Map[Id, Declaration[_]]) {
 
       def this() = this(Vector(), Map())
 
-      def +(b: Block): BlockStore = {
+      def +[B >: T <: Block](b: B): BlockStore[B] = {
         val newBlocks = blocks :+ b
         val toProcess = (b match {
           case wrapper: Wrapper =>
@@ -414,7 +418,7 @@ package object model {
           case x: Declaration[_] => (x.id, x)
         }
 
-        new BlockStore(newBlocks, newDeclarations)
+        new BlockStore[B](newBlocks, newDeclarations)
       }
     }
 
@@ -431,7 +435,7 @@ package object model {
         case Some(p) => p.root
         case None    => this
       }
-      def store: BlockStore
+      def store: BlockStore[Block]
 
       def findDeclaration(localID: String): Option[Declaration[_]] = {
         (localID.split("\\.").toList match {
