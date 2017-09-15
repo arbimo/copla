@@ -28,11 +28,11 @@ object Planner extends App {
 
   val conf: Config = parser.parse(args, Config()) match {
     case Some(x) => x
-    case None => System.exit(1); null
+    case None    => System.exit(1); null
   }
 
-  val pb = Utils.problem(conf.file)
-  val csp = Utils.csp(pb)
+  val pb       = Utils.problem(conf.file)
+  val csp      = Utils.csp(pb)
   val searcher = new TreeSearch(List(csp))
   searcher.incrementalDeepeningSearch() match {
     case Left(solution) =>
@@ -54,17 +54,38 @@ object Utils {
           case Success(pb) => pb
           case Failure(NonFatal(e)) =>
             e.printStackTrace()
-            sys.error("Error while converting the ANML model: "+e.getLocalizedMessage)
+            sys.error("Error while converting the ANML model: " + e.getLocalizedMessage)
           case Failure(e) => throw e
         }
       case fail: GenFailure => throw new RuntimeException(fail.format)
     }
   }
 
-  def csp(pb: Problem) : CSP = {
+  def problem(anml: String): Problem = {
+    Parser.parse(anml) match {
+      case ParseSuccess(m) =>
+        Try {
+          new Problem(FullToCore.trans(m))
+        } match {
+          case Success(pb) => pb
+          case Failure(NonFatal(e)) =>
+            e.printStackTrace()
+            sys.error("Error while converting the ANML model: " + e.getLocalizedMessage)
+          case Failure(e) => throw e
+        }
+      case fail: GenFailure => throw new RuntimeException(fail.format)
+    }
+  }
+
+  def csp(pb: Problem): CSP = {
     val csp = new CSP(Left(new Configuration(enforceTpAfterStart = false)))
     csp.addHandler(new PlanningHandler(csp, Left(pb)))
     csp.addEvent(InitPlanner)
     csp
+  }
+
+  def plan(csp: CSP) = {
+    val searcher = new TreeSearch(List(csp))
+    searcher.incrementalDeepeningSearch()
   }
 }

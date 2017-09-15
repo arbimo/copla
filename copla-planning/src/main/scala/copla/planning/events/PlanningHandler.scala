@@ -99,11 +99,12 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
     RelativeTimepoint(absoluteTimepoint, tpRef.delay)
   }
 
-    def insertChronicle(chronicle: Chronicle): Unit = {
-      chronicle.content.foreach {
-        case x: Any if false =>
-      }
+  def insertChronicle(chronicle: Chronicle): CSPUpdateResult = {
+    chronicle.content.foreach {
+      case x: Any if false =>
     }
+    ???
+  }
   //    for(c <- chronicle.bindingConstraints.asScala)  c match {
   //      case c: VarInequalityConstraint =>
   //        csp.post(variable(c.leftVar) =!= variable(c.rightVar))
@@ -143,12 +144,12 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
   //  }
 
   override def handleEvent(event: Event): CSPUpdateResult = {
-        event match {
-          case InitPlanner =>
-            csp.addEvent(ChronicleAdded(pb.chronicle))
-          case ChronicleAdded(chronicle) =>
-            insertChronicle(chronicle)
-          case ActionInsertion(actionTemplate, support) => ??? //TODO
+    val res: CSPUpdateResult = event match {
+      case InitPlanner =>
+        csp.addEvent(ChronicleAdded(pb.chronicle))
+      case ChronicleAdded(chronicle) =>
+        insertChronicle(chronicle)
+      case ActionInsertion(actionTemplate, support) => ??? //TODO
 //            val act = Factory.getStandaloneAction(pb, actionTemplate, RefCounter.getGlobalCounter)
 //            actions += act
 //            insertChronicle(act.chronicle)
@@ -157,14 +158,12 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
 //              case Some(supportVar) => csp.post(new SupportByAction(act, supportVar))
 //              case None =>
 //            }
-          case e: PlanningStructureAdded =>
-          case event: PlanningEvent =>
-            throw new NotImplementedError(s"The event $event is not handle")
-          case _ => // not concerned by this event
-        }
-        for(h <- subhandlers)
-          h.handleEvent(event)
-    ???
+      case e: PlanningStructureAdded => Consistent
+      case event: PlanningEvent =>
+        throw new NotImplementedError(s"The event $event is not handle")
+      case _ => Consistent // not concerned by this event
+    }
+    res ==> CSPUpdateResult.thenForEach[PlanningEventHandler](subhandlers, _.handleEvent(event))
   }
 
   override def clone(newCSP: CSP): InternalCSPEventHandler =
