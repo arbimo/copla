@@ -1,8 +1,8 @@
 package copla.planning.causality
 
 import copla.constraints.bindings.InconsistentBindingConstraintNetwork
-import copla.constraints.meta.CSP
-import copla.constraints.meta.constraints.{ConjunctionConstraint, Constraint, ConstraintSatisfaction, Contradiction}
+import copla.constraints.meta.{CSP, CSPView}
+import copla.constraints.meta.constraints._
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -11,6 +11,7 @@ import copla.constraints.meta.events.Event
 import copla.constraints.meta.types.statics.Type
 import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.{IVar, IntVar, IntVariable, VarWithDomain}
+import copla.lang.model.core
 import copla.planning.structures.Holds
 
 class PotentialSupport(context: CausalHandler) {
@@ -18,39 +19,41 @@ class PotentialSupport(context: CausalHandler) {
   private val planner = context.context
   private val pb = planner.pb
 
-//  val actionPotentialSupports = mutable.Map[AbstractAction, ActionPotentialSupport]()
-//
-//  for(a <- pb.abstractActions.asScala) {
-//    actionPotentialSupports.put(a, new ActionPotentialSupport(a, context))
-//  }
-//
-//  def report : String = "--- Potential supports ---\n" +
-//    actionPotentialSupports.values.map(_.report).mkString("\n")
+  val actionPotentialSupports: mutable.Map[core.ActionTemplate, ActionPotentialSupport] = mutable.Map()
+
+  for(a <- pb.actionTemplates) {
+    actionPotentialSupports.put(a, new ActionPotentialSupport(a, context))
+  }
+
+  def report : String = "--- Potential supports ---\n" +
+    actionPotentialSupports.values.map(_.report).mkString("\n")
 
   def clone(newContext: CausalHandler) : PotentialSupport = this // should be perfectly immutable
 }
 
 
-class ActionPotentialSupport(val act: Any /* TODO: AbstractAction */, private var context: CausalHandler) {
-//
-//  /** Constraint require that the given variable take a value in the given domain. */
-//  class InDomain(variable: IntVariable, domain: Domain) extends Constraint {
-//    override def variables(implicit csp: CSP): Set[IVar] = Set(variable)
-//    override def satisfaction(implicit csp: CSP): Satisfaction =
-//      if(variable.domain.emptyIntersection(domain)) ConstraintSatisfaction.VIOLATED
-//      else if(variable.domain.containedBy(domain)) ConstraintSatisfaction.SATISFIED
-//      else ConstraintSatisfaction.UNDEFINED
-//
-//    override protected def _propagate(event: Event)(implicit csp: CSP): Unit =
-//      if(variable.domain.emptyIntersection(domain))
-//        throw new InconsistentBindingConstraintNetwork()
-//      else if(variable.domain.containedBy(domain))
-//        csp.updateDomain(variable, variable.domain & domain)
-//
-//    /** Returns the invert of this constraint (e.g. === for an =!= constraint) */
-//    override def reverse: Constraint = ???
-//  }
-//
+class ActionPotentialSupport(val act: core.ActionTemplate, private var context: CausalHandler) {
+
+  /** Constraint require that the given variable take a value in the given domain. TODO */
+  class InDomain(variable: IntVariable, domain: Domain) extends Constraint {
+    override def variables(implicit csp: CSPView): Set[IVar] = Set(variable)
+    override def satisfaction(implicit csp: CSPView): Satisfaction =
+      if(variable.domain.emptyIntersection(domain)) ConstraintSatisfaction.VIOLATED
+      else if(variable.domain.containedBy(domain)) ConstraintSatisfaction.SATISFIED
+      else ConstraintSatisfaction.UNDEFINED
+
+    override protected def propagate(event: Event)(implicit csp: CSPView): PropagationResult =
+      if(variable.domain.emptyIntersection(domain))
+        Inconsistency
+      else if(variable.domain.containedBy(domain))
+        Satisfied()
+      else
+        Satisfied(UpdateDomain(variable, variable.domain & domain))
+
+    /** Returns the invert of this constraint (e.g. === for an =!= constraint) */
+    override def reverse: Constraint = ???
+  }
+
 //  /** Constraint that requires the N given variables to take values in the N given domains. */
 //  class PotentialSupportFeasibility(vars: Seq[IntVariable], domains: Seq[Domain])
 //    extends ConjunctionConstraint(vars.zip(domains).map(x => new InDomain(x._1, x._2))) {
@@ -105,7 +108,7 @@ class ActionPotentialSupport(val act: Any /* TODO: AbstractAction */, private va
 //        new Contradiction
 //    }
 //  }
-//
+
 //  def report : String = {
 //    val sb = new StringBuilder
 //    sb.append(s"Supports for action $act\n")

@@ -113,12 +113,12 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
 
   private def supportConstraintForChange(c: Change) : Constraint =
     if(holds.precedingChange)
-      holds.sv === c.sv &&
+      holds.fluent === c.fluent &&
         holds.value === c.value &&
         holds.persists.start >= c.persists.start &&
         holds.persists.end === c.persists.end
     else
-      holds.sv === c.sv &&
+      holds.fluent === c.fluent &&
         holds.value === c.value &&
         holds.persists.start >= c.persists.start &&
         holds.persists.end <= c.persists.end

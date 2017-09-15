@@ -16,8 +16,8 @@ object CausalStruct {
 
   type AssertionNeedingSupport = core.TimedAssertion with core.RequiresSupport
 
-  def assertionAsCausalStructs(assertion: core.TimedAssertion,
-                               p: PlanningHandler): Seq[PStruct] = {
+  def assertionAsPlanningStructs(assertion: core.TimedAssertion,
+                                 p: PlanningHandler): Seq[PStruct] = {
     assertion match {
       case statement: core.TimedEqualAssertion =>
         val hold = new Holds(p.sv(statement.fluent),
@@ -46,9 +46,10 @@ object CausalStruct {
         val change = new Change(
           p.sv(statement.fluent),
           p.variable(statement.value),
-          new TemporalInterval(p.tp(statement.start-1), p.tp(statement.start)),
+          new TemporalInterval(p.tp(statement.start - 1), p.tp(statement.start)),
           new TemporalInterval(p.tp(statement.start), endPersist),
-          statement)
+          statement
+        )
         Seq(change, PlanningConstraint(p.tp(statement.end) <= endPersist))
     }
 
@@ -58,47 +59,33 @@ object CausalStruct {
 
 /**
   *
-  * @param sv
-  * @param value
+  * @param fluent Fluent whose value will change
+  * @param value Value the fluent is going to take
   * @param changing Temporal interval over which the value is changing
   * @param persists Temporal interval over which the new value CAN persist.
-  * @param ref
+  * @param ref Assertion that lead to the creation of this structure.
   */
-class Change(val sv: SVar,
+class Change(val fluent: SVar,
              val value: Var,
              val changing: TemporalInterval,
              val persists: TemporalInterval,
              val ref: CausalStruct.AssertionWithChange)
     extends CausalStruct {
 
-  override def toString = s"$sv := $value"
-}
-
-object Change {
-
-  def apply(statement: CausalStruct.AssertionWithChange, p: PlanningHandler): Change = {
-    //    new Change(
-    //      p.sv(statement.fluent),
-    //      p.variable(statement.endValue),
-    //      new TemporalInterval(p.tp(statement.start), p.tp(statement.end)),
-    //      new TemporalInterval(p.tp(statement.end), p.csp.varStore.getTimepoint()),
-    //      statement)
-    ??? //TODO
-  }
-
+  override def toString = s"$fluent := $value"
 }
 
 /** Assertion requiring the state variable `sv` to have the value `value` over the (inclusive) temporal interval `persists`.
   * If preceding change is true, then the state variable will start changing value at `persists.end +1`.
   * This is typically the case when it represents the initial condition of a transition.*/
-class Holds(val sv: SVar,
+class Holds(val fluent: SVar,
             val value: Var,
             val persists: TemporalInterval,
             val precedingChange: Boolean,
             val ref: CausalStruct.AssertionNeedingSupport)
     extends CausalStruct {
 
-  override def toString = s"$sv == $value"
+  override def toString = s"$fluent == $value"
 }
 
 object Holds {

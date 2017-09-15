@@ -64,11 +64,11 @@ class CausalHandler(val context: PlanningHandler, base: Option[CausalHandler] = 
     val sb = new StringBuilder
     sb.append("%% Changes\n")
     for(c <- changes) {
-      sb.append(s"${c.sv}:=${c.value} -- change:]${time(c.changing.start)}, ${time(c.changing.end)}[ -- persist:[${time(c.persists.start)}, ${time(c.persists.end)}]\n")
+      sb.append(s"${c.fluent}:=${c.value} -- change:]${time(c.changing.start)}, ${time(c.changing.end)}[ -- persist:[${time(c.persists.start)}, ${time(c.persists.end)}]\n")
     }
     sb.append("%% Holds\n")
     for(c <- holds) {
-      sb.append(s"${c.sv}==${c.value} -- persist:[${time(c.persists.start)}, ${time(c.persists.end)}]\n")
+      sb.append(s"${c.fluent}==${c.value} -- persist:[${time(c.persists.start)}, ${time(c.persists.end)}]\n")
     }
     sb.toString()
   }

@@ -12,4 +12,7 @@ class Problem(val anml: Seq[InModuleBlock]) {
     .collectFirst { case TimepointDeclaration(tp) if tp.id.name == "end" => tp }
     .getOrElse(sys.error("No end timepoint in ANML module"))
 
+  lazy val actionTemplates: Seq[ActionTemplate] = anml.collect {
+    case act: ActionTemplate => act
+  }
 }
