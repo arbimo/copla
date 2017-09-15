@@ -1,6 +1,6 @@
 package copla.planning.causality
 
-import copla.constraints.meta.{CSPUpdateResult, Consistent}
+import copla.constraints.meta.{CSP, CSPUpdateResult, Consistent}
 import copla.constraints.meta.events.Event
 import copla.constraints.meta.stn.variables.{RelativeTimepoint, Timepoint}
 import copla.constraints.meta.types.dynamics.{BaseDynamicType, ComposedDynamicType}
@@ -22,7 +22,7 @@ object DecisionType extends BaseType[SupportOption]("decision-type", List((Decis
 
 class CausalHandler(val context: PlanningHandler, base: Option[CausalHandler] = None) extends PlanningEventHandler {
 
-  implicit val csp = context.csp
+  implicit val csp: CSP = context.csp
 
   val changes: mutable.ArrayBuffer[Change] = base match {
     case Some(prev) => prev.changes.clone()
@@ -45,15 +45,15 @@ class CausalHandler(val context: PlanningHandler, base: Option[CausalHandler] = 
       assert1(changes.isEmpty)
       new BaseDynamicType("existing-change-support", Nil)
   }
-  val actionInsertionSupportType: BaseType[SupportByActionInsertion] = ??? // TODO
-//    base match {
-//    case Some(prev) => prev.actionInsertionSupportType
-//    case None => new BaseType("action-insertion-support",
-//      potentialSupports.actionPotentialSupports.values
-//        .map(SupportByActionInsertion(_))
-//        .zipWithIndex.toList
-//        .map(p => (p._1, p._2+1)))
-//  }
+  val actionInsertionSupportType: BaseType[SupportByActionInsertion] =
+    base match {
+    case Some(prev) => prev.actionInsertionSupportType
+    case None => new BaseType("action-insertion-support",
+      potentialSupports.actionPotentialSupports.values
+        .map(SupportByActionInsertion)
+        .zipWithIndex.toList
+        .map(p => (p._1, p._2+1)))
+  }
   val supportType: ComposedDynamicType[SupportOption] = base match {
     case Some(prev) => prev.supportType
     case None => new ComposedDynamicType[SupportOption](DecisionType :: actionInsertionSupportType :: existingSupportType :: Nil)
@@ -82,14 +82,14 @@ class CausalHandler(val context: PlanningHandler, base: Option[CausalHandler] = 
           csp.post(Threat(c, s))
         csp.post(new SupportConstraint(supportType, s))
         holds += s
-      case PlanningStructureAdded(s: Change) => ??? //TODO
-//        existingSupportType.addInstance(SupportByExistingChange(s), 1 + potentialSupports.actionPotentialSupports.size + changes.size)
-//        csp.post(s.persists.start <= s.persists.end)
-//        for(h <- holds)
-//          csp.post(Threat(s, h))
-//        for(c <- changes)
-//          csp.post(Threat(c, s))
-//        changes += s
+      case PlanningStructureAdded(s: Change) =>
+        existingSupportType.addInstance(SupportByExistingChange(s), 1 + potentialSupports.actionPotentialSupports.size + changes.size)
+        csp.post(s.persists.start <= s.persists.end)
+        for(h <- holds)
+          csp.post(Threat(s, h))
+        for(c <- changes)
+          csp.post(Threat(c, s))
+        changes += s
       case PlanningStructureAdded(_: CausalStruct) => throw new NotImplementedError()
 
       case _ => // not a causal structure, ignore

@@ -9,7 +9,7 @@ import copla.constraints.meta.stn.variables.{RelativeTimepoint, Timepoint}
 import copla.constraints.meta.util.Assertion._
 import copla.planning.causality.CausalHandler
 import copla.planning.causality.support.SupportByAction
-import copla.planning.model.Problem
+import copla.planning.model.{Chronicle, Problem}
 import copla.planning.structures.{Change, Holds}
 import copla.planning.types.{AnmlVarType, TypeHandler}
 import copla.planning.variables.{FVar, InstanceVar, SVar, Var}
@@ -99,7 +99,11 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
     RelativeTimepoint(absoluteTimepoint, tpRef.delay)
   }
 
-  //  def insertChronicle(chronicle: Chronicle) {
+    def insertChronicle(chronicle: Chronicle): Unit = {
+      chronicle.content.foreach {
+        case x: Any if false =>
+      }
+    }
   //    for(c <- chronicle.bindingConstraints.asScala)  c match {
   //      case c: VarInequalityConstraint =>
   //        csp.post(variable(c.leftVar) =!= variable(c.rightVar))
@@ -139,28 +143,27 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
   //  }
 
   override def handleEvent(event: Event): CSPUpdateResult = {
-    //    event match {
-    //      case InitPlanner =>
-    //        for(chronicle <- pb.chronicles.asScala)
-    //          csp.addEvent(ChronicleAdded(chronicle))
-    //      case ChronicleAdded(chronicle) =>
-    //        insertChronicle(chronicle)
-    //      case ActionInsertion(actionTemplate, support) =>
-    //        val act = Factory.getStandaloneAction(pb, actionTemplate, RefCounter.getGlobalCounter)
-    //        actions += act
-    //        insertChronicle(act.chronicle)
-    //        csp.post(csp.temporalOrigin <= tp(act.start))
-    //        support match {
-    //          case Some(supportVar) => csp.post(new SupportByAction(act, supportVar))
-    //          case None =>
-    //        }
-    //      case e: PlanningStructureAdded =>
-    //      case event: PlanningEvent =>
-    //        throw new NotImplementedError(s"The event $event is not handle")
-    //      case _ => // not concerned by this event
-    //    }
-    //    for(h <- subhandlers)
-    //      h.handleEvent(event)
+        event match {
+          case InitPlanner =>
+            csp.addEvent(ChronicleAdded(pb.chronicle))
+          case ChronicleAdded(chronicle) =>
+            insertChronicle(chronicle)
+          case ActionInsertion(actionTemplate, support) => ??? //TODO
+//            val act = Factory.getStandaloneAction(pb, actionTemplate, RefCounter.getGlobalCounter)
+//            actions += act
+//            insertChronicle(act.chronicle)
+//            csp.post(csp.temporalOrigin <= tp(act.start))
+//            support match {
+//              case Some(supportVar) => csp.post(new SupportByAction(act, supportVar))
+//              case None =>
+//            }
+          case e: PlanningStructureAdded =>
+          case event: PlanningEvent =>
+            throw new NotImplementedError(s"The event $event is not handle")
+          case _ => // not concerned by this event
+        }
+        for(h <- subhandlers)
+          h.handleEvent(event)
     ???
   }
 

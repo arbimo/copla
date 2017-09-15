@@ -15,4 +15,13 @@ class Problem(val anml: Seq[InModuleBlock]) {
   lazy val actionTemplates: Seq[ActionTemplate] = anml.collect {
     case act: ActionTemplate => act
   }
+
+  lazy val chronicle = new Chronicle(
+    anml.collect { case s: Statement => s }
+  )
+
+  private val coverageTest = anml.map {
+    case x: Statement => null
+    case x: Declaration[_] => null
+  }
 }

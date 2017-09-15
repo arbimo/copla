@@ -4,6 +4,7 @@ import copla.constraints.meta.CSP
 import copla.constraints.meta.constraints.ConjunctionConstraint
 import copla.constraints.meta.decisions.{Decision, DecisionConstraint, DecisionOption}
 import copla.constraints.meta.util.Assertion._
+import copla.lang.model.core
 import copla.planning.causality.{CausalHandler, DecisionPending, SupportByActionInsertion, SupportByExistingChange}
 import copla.planning.events.{ActionInsertion, PlanningHandler}
 
@@ -46,7 +47,7 @@ class SupportDecision(supportVar: SupportVar) extends Decision {
   override def toString : String = s"support-decision@[${supportVar.target}"
 }
 
-class PendingSupportOption(action: Any /* TODO: AbstractAction */, supportFor: SupportVar) extends DecisionOption {
+class PendingSupportOption(action: core.ActionTemplate, supportFor: SupportVar) extends DecisionOption {
   /** This method should enforce the decision option in the given CSP. */
   override def enforceIn(csp: CSP) {
     csp.addEvent(ActionInsertion(action, Some(supportFor)))

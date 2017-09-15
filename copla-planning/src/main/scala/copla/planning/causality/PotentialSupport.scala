@@ -42,7 +42,7 @@ class ActionPotentialSupport(val act: core.ActionTemplate, private var context: 
       else if (variable.domain.containedBy(domain)) ConstraintSatisfaction.SATISFIED
       else ConstraintSatisfaction.UNDEFINED
 
-    override protected def propagate(event: Event)(implicit csp: CSPView): PropagationResult =
+    override def propagate(event: Event)(implicit csp: CSPView): PropagationResult =
       if (variable.domain.emptyIntersection(domain))
         Inconsistency
       else if (variable.domain.containedBy(domain))
