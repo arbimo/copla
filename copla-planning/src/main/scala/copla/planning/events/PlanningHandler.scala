@@ -88,7 +88,7 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
     case list     => throw new IllegalArgumentException("Multiple handlers of such type")
   }
 
-    def tp(tpRef: core.TPRef): Timepoint =
+    def tp(tpRef: core.TPRef): Timepoint = // TODO take into account the delay in TPRef
       if(tpRef == pb.start)
         csp.temporalOrigin
       else if(tpRef == pb.end)

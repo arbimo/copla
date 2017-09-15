@@ -174,16 +174,23 @@ package object model {
       override def toString: String = s"$constant == $variable"
     }
 
-    trait TimedAssertion extends Statement {
+    sealed trait TimedAssertion extends Statement {
       def start: TPRef
       def end: TPRef
+      def fluent: Fluent
     }
+    /** Denotes an assertion that requires causal support */
+    sealed trait RequiresSupport { self: TimedAssertion => }
+
+    /** Denotes an assertion that changes a fluent */
+    sealed trait ProvidesChange { self: TimedAssertion => }
+
     case class TimedEqualAssertion(start: TPRef, end: TPRef, fluent: Fluent, value: Var)
-        extends TimedAssertion {
+        extends TimedAssertion with RequiresSupport {
       override def toString: String = s"[$start, $end] $fluent == $value"
     }
     case class TimedAssignmentAssertion(start: TPRef, end: TPRef, fluent: Fluent, value: Var)
-        extends TimedAssertion {
+        extends TimedAssertion with ProvidesChange {
       override def toString: String = s"[$start,$end] $fluent := $value"
     }
     case class TimedTransitionAssertion(start: TPRef,
@@ -191,7 +198,7 @@ package object model {
                                         fluent: Fluent,
                                         from: Var,
                                         to: Var)
-        extends TimedAssertion {
+        extends TimedAssertion with RequiresSupport with ProvidesChange {
       override def toString: String = s"[$start, $end] $fluent == $start :-> $end"
     }
 
