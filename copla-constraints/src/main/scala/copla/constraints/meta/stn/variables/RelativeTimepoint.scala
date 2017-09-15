@@ -11,6 +11,9 @@ case class RelativeTimepoint(tp: Timepoint, delay: Int) extends VarWithDomain {
   override def domain(implicit csp: CSPView): IntervalDomain = tp.domain.shift(delay)
 
   def +(delay: Int): RelativeTimepoint = RelativeTimepoint(tp, this.delay + delay)
+  def -(delay: Int): RelativeTimepoint = RelativeTimepoint(tp, this.delay - delay)
+
+  def -(o: RelativeTimepoint): TemporalDelay = new TemporalDelay(o, this)
 
   def <=(o: RelativeTimepoint): MinDelay = new MinDelay(tp, o.tp, delay - o.delay)
   def <(o: RelativeTimepoint): MinDelay  = new MinDelay(tp, o.tp, delay - o.delay + 1)

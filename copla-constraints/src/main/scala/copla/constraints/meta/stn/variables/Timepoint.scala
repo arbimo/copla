@@ -14,6 +14,11 @@ class Timepoint(val id: Int, ref: Option[Any]) extends VarWithDomain {
   def isStructural: Boolean = false
   def isContingent: Boolean = false
 
+  def +(delay: Int): RelativeTimepoint = RelativeTimepoint(this, delay)
+  def -(delay: Int): RelativeTimepoint = RelativeTimepoint(this, -delay)
+  def -(o: RelativeTimepoint): TemporalDelay = Timepoint.asRelativeTimepoint(this) - o
+  def -(o: Timepoint): TemporalDelay = this - Timepoint.asRelativeTimepoint(o)
+
   override def ===(value: Int): Constraint = Timepoint.asRelativeTimepoint(this) === value
 
   override def =!=(value: Int): Constraint = Timepoint.asRelativeTimepoint(this) =!= value
