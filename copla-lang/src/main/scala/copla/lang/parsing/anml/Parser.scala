@@ -515,15 +515,17 @@ object Parser {
     **/
   def parse(input: String, previousModel: Option[Model] = None): ParseResult = {
     def formatFailure(failure: Failure[Char, String]): ParseFailure = {
-      def toLineAndColumn(lines: Iterable[String],
+      def toLineAndColumn(lines: Seq[String],
                           index: Int,
                           lineNumber: Int = 0): (String, Int, Int) =
-        if (lines.nonEmpty && index <= lines.head.length)
-          (lines.head, lineNumber, index)
-        else if (lines.nonEmpty)
-          toLineAndColumn(lines.tail, index - lines.head.length - 1, lineNumber + 1)
-        else
-          sys.error("Index is not in the provided lines")
+        lines match {
+          case Seq(head, _*) if index <= head.length =>
+            (lines.head, lineNumber, index)
+          case Seq(head, tail@_*) =>
+            toLineAndColumn(tail, index - head.length - 1, lineNumber + 1)
+          case _ =>
+            sys.error("Index is not in the provided lines")
+        }
 
       val (faultyLine, faultyLineNumber, faultyColumnNumber) =
         toLineAndColumn(input.split('\n'), failure.index)
