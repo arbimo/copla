@@ -95,7 +95,7 @@ class Holds(val sv: SVar,
             val value: Var,
             val persists: TemporalInterval,
             val precedingChange: Boolean,
-            val ref: AssertionNeedingSupport)
+            val ref: CausalStruct.AssertionNeedingSupport)
     extends CausalStruct {
 
   override def toString = s"$sv == $value"
@@ -103,7 +103,7 @@ class Holds(val sv: SVar,
 
 object Holds {
 
-  def apply(statement: AssertionNeedingSupport, p: PlanningHandler): Holds = {
+  def apply(statement: CausalStruct.AssertionNeedingSupport, p: PlanningHandler): Holds = {
     statement match {
       case statement: core.TimedEqualAssertion =>
         new Holds(p.sv(statement.fluent),

@@ -29,6 +29,8 @@ package object model {
 
     case class Id(scope: Scope, name: String) {
       override def toString: String = scope.toScopedString(name)
+
+      def toTPId: TPId = new TPId(this)
     }
 
     case class Scope(path: Seq[String]) {
@@ -213,8 +215,14 @@ package object model {
       def ===(dur: Int): Seq[TBefore] = Seq(this <= dur, this >= dur)
     }
 
+
+    class TPId(val id: Id) extends AnyVal
+    object TPId {
+      implicit def asId(tpId: TPId): Id = tpId.id
+    }
+
     /** A timepoint, declared when appearing in the root of a context.*/
-    case class TPRef(id: Id, delay: Int = 0) {
+    case class TPRef(id: TPId, delay: Int = 0) {
 
       override def toString: String =
         id.toString + (delay match {
@@ -300,8 +308,8 @@ package object model {
     abstract class TimedAssertion(parent: Option[Ctx], name: String)
         extends Ctx with Block {
 
-      val start: TPRef = new TPRef(this.id("start"))
-      val end: TPRef   = new TPRef(this.id("end"))
+      val start: TPRef = new TPRef(this.id("start").toTPId)
+      val end: TPRef   = new TPRef(this.id("end").toTPId)
 
       override val store: BlockStore[Statement] = new BlockStore[Statement]() +
         new TimepointDeclaration(start) +
@@ -518,7 +526,4 @@ package object model {
 
     }
   }
-
-  import full._
-
 }

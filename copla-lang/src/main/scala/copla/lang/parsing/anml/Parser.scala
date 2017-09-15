@@ -62,7 +62,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
   val timepointDeclaration: Parser[TimepointDeclaration] =
     timepointKW ~/
-      freeIdent.map(name => new TimepointDeclaration(new TPRef(ctx.id(name)))) ~
+      freeIdent.map(name => new TimepointDeclaration(new TPRef(ctx.id(name).toTPId))) ~
       ";"
 
   protected val definedTP: Parser[TPRef] =
@@ -439,8 +439,8 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
     }
     val emptyAct = new ActionTemplate(actionName, container)
     emptyAct +
-      new TimepointDeclaration(new TPRef(new Id(emptyAct.scope, "start"))) +
-      new TimepointDeclaration(new TPRef(new Id(emptyAct.scope, "end")))
+      new TimepointDeclaration(new TPRef(new Id(emptyAct.scope, "start").toTPId)) +
+      new TimepointDeclaration(new TPRef(new Id(emptyAct.scope, "end").toTPId))
   }
 
   val parser: Parser[ActionTemplate] =

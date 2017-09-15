@@ -2,12 +2,8 @@ package copla.planning.structures
 
 import copla.constraints.meta.stn.constraint.MinDelay
 import copla.constraints.meta.stn.variables.Timepoint
-import copla.lang.model.core
 
-import scala.concurrent.duration.Deadline
-
-
-class RelativeTimepoint(tp: Timepoint, delay: Int) {
+class RelativeTimepoint(val tp: Timepoint, val delay: Int) {
 
   def +(delay: Int): RelativeTimepoint = new RelativeTimepoint(tp, this.delay + delay)
 
@@ -31,5 +27,4 @@ class RelativeTimepoint(tp: Timepoint, delay: Int) {
     if(delay == 0) tp.toString
     else if(delay > 0) s"$tp + $delay"
     else s"$tp - ${-delay}"
-
 }
