@@ -57,7 +57,7 @@ abstract class IntVariable(val ref: Option[Any]) extends VarWithDomain {
 
   def initialDomain(implicit csp: CSPView): Domain
 
-  def domain(implicit csp: CSPView) = csp.dom(this)
+  def domain(implicit csp: CSPView): Domain = csp.dom(this)
 
   /** By default, any IntVar is a decision variable */
   override def isDecisionVar: Boolean = true
@@ -82,18 +82,16 @@ class BooleanVariable(initialDomain: Domain, ref: Option[Any]) extends IntVar(in
 
   def this(initialDomain: Domain) = this(initialDomain, None)
 
-  def isTrue(implicit csp: CSP): Boolean =
+  def isTrue(implicit csp: CSPView): Boolean =
     domain.isSingleton && domain.contains(1)
 
-  def isFalse(implicit csp: CSP): Boolean =
+  def isFalse(implicit csp: CSPView): Boolean =
     domain.isSingleton && domain.contains(0)
 }
 
-class VariableSeq(val variables: Seq[IVar], ref: Option[Any]) extends IVar {
+class VariableSeq(val variables: Seq[IVar], ref: Option[Any] = None) extends IVar {
 
-  def this(variables: Seq[IVar]) = this(variables, None)
-
-  override def toString = ref match {
+  override def toString: String = ref match {
     case Some(x) => s"$x"
     case None    => s"(${variables.map(_.toString).mkString(", ")})"
   }
