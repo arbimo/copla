@@ -65,5 +65,7 @@ class IntervalDomain(val lb: Int, val ub: Int) extends Domain {
     case o => super.union(other)
   }
 
+  def shift(increment: Int): IntervalDomain = new IntervalDomain(lb + increment, ub + increment)
+
   override def toString = s"[$lb, $ub]"
 }

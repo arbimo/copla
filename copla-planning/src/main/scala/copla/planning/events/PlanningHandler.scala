@@ -5,7 +5,7 @@ import copla.constraints.meta.constraints.ExtensionConstraint
 import copla.constraints.meta.domains.ExtensionDomain
 import copla.constraints.meta.events.{Event, InternalCSPEventHandler}
 import copla.constraints.meta.stn.constraint.{Contingent, MinDelay}
-import copla.constraints.meta.stn.variables.Timepoint
+import copla.constraints.meta.stn.variables.{RelativeTimepoint, Timepoint}
 import copla.constraints.meta.util.Assertion._
 import copla.planning.causality.CausalHandler
 import copla.planning.causality.support.SupportByAction
@@ -88,13 +88,16 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
     case list     => throw new IllegalArgumentException("Multiple handlers of such type")
   }
 
-    def tp(tpRef: core.TPRef): Timepoint = // TODO take into account the delay in TPRef
-      if(tpRef == pb.start)
+  def tp(tpRef: core.TPRef): RelativeTimepoint = {
+    val absoluteTimepoint =
+      if (tpRef.id == pb.start.id)
         csp.temporalOrigin
-      else if(tpRef == pb.end)
+      else if (tpRef.id == pb.end.id)
         csp.temporalHorizon
       else
         csp.varStore.getTimepoint(tpRef)
+    RelativeTimepoint(absoluteTimepoint, tpRef.delay)
+  }
 
   //  def insertChronicle(chronicle: Chronicle) {
   //    for(c <- chronicle.bindingConstraints.asScala)  c match {

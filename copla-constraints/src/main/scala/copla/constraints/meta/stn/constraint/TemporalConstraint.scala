@@ -5,7 +5,7 @@ import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints._
 import copla.constraints.meta.events.Event
 import copla.constraints.meta.events.NewConstraint
-import copla.constraints.meta.stn.variables.Timepoint
+import copla.constraints.meta.stn.variables.{RelativeTimepoint, Timepoint}
 import copla.constraints.meta.variables.IVar
 
 abstract class TemporalConstraint extends Constraint {

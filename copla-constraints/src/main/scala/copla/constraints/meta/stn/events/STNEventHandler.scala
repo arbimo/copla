@@ -60,11 +60,11 @@ class STNEventHandler(implicit val csp: CSP)
     }
   }
 
-  /** Returns all delay that a gien constraint should be monitoring. */
+  /** Returns all delay that a given constraint should be monitoring. */
   private def watches(c: Constraint): Iterable[(Timepoint, Timepoint)] = {
     c.variables.collect {
       case tp: Timepoint    => (csp.temporalOrigin, tp)
-      case d: TemporalDelay => (d.from, d.to)
+      case d: TemporalDelay => (d.from.tp, d.to.tp)
     }
   }
 

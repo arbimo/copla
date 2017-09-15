@@ -9,10 +9,10 @@ package object model {
   def defaultId(): String  = reservedPrefix + { nextID += 1; nextID - 1 }
 
   object core {
-    sealed trait Block            extends full.Block with InCore
-    sealed trait InModuleBlock    extends full.InModuleBlock with InCore
-    sealed trait InActionBlock    extends full.InActionBlock with InCore
-    sealed trait Statement extends InModuleBlock with InActionBlock with full.Statement
+    sealed trait Block         extends full.Block with InCore
+    sealed trait InModuleBlock extends full.InModuleBlock with InCore
+    sealed trait InActionBlock extends full.InActionBlock with InCore
+    sealed trait Statement     extends InModuleBlock with InActionBlock with full.Statement
 
     sealed trait InCore
 
@@ -143,14 +143,16 @@ package object model {
     }
 
     case class Constant(override val template: ConstantTemplate, override val params: Seq[Var])
-        extends full.Constant(template, params) with Function {
+        extends full.Constant(template, params)
+        with Function {
       override def toString: String = super.toString
     }
     class BoundConstant(override val template: ConstantTemplate, override val params: Seq[Instance])
         extends Constant(template, params)
 
     case class Fluent(override val template: FluentTemplate, override val params: Seq[Param])
-        extends full.Fluent(template, params) with Function {
+        extends full.Fluent(template, params)
+        with Function {
 
       override def toString = s"$template(${params.mkString(", ")})"
     }
@@ -181,18 +183,23 @@ package object model {
       def end: TPRef
       def fluent: Fluent
     }
+
     /** Denotes an assertion that requires causal support */
-    sealed trait RequiresSupport { self: TimedAssertion => }
+    sealed trait RequiresSupport { self: TimedAssertion =>
+    }
 
     /** Denotes an assertion that changes a fluent */
-    sealed trait ProvidesChange { self: TimedAssertion => }
+    sealed trait ProvidesChange { self: TimedAssertion =>
+    }
 
     case class TimedEqualAssertion(start: TPRef, end: TPRef, fluent: Fluent, value: Var)
-        extends TimedAssertion with RequiresSupport {
+        extends TimedAssertion
+        with RequiresSupport {
       override def toString: String = s"[$start, $end] $fluent == $value"
     }
     case class TimedAssignmentAssertion(start: TPRef, end: TPRef, fluent: Fluent, value: Var)
-        extends TimedAssertion with ProvidesChange {
+        extends TimedAssertion
+        with ProvidesChange {
       override def toString: String = s"[$start,$end] $fluent := $value"
     }
     case class TimedTransitionAssertion(start: TPRef,
@@ -200,7 +207,9 @@ package object model {
                                         fluent: Fluent,
                                         from: Var,
                                         to: Var)
-        extends TimedAssertion with RequiresSupport with ProvidesChange {
+        extends TimedAssertion
+        with RequiresSupport
+        with ProvidesChange {
       override def toString: String = s"[$start, $end] $fluent == $start :-> $end"
     }
 
@@ -214,7 +223,6 @@ package object model {
       def -(time: Int): Delay         = Delay(from, to - time)
       def ===(dur: Int): Seq[TBefore] = Seq(this <= dur, this >= dur)
     }
-
 
     class TPId(val id: Id) extends AnyVal
     object TPId {
@@ -242,9 +250,12 @@ package object model {
 
       def -(other: TPRef) = Delay(other, this)
     }
-    case class TimepointDeclaration(tp: TPRef)
-        extends Declaration[TPRef]
-        with Statement {
+    class SimpleTPRef(id: TPId) extends TPRef(id, 0) {
+      override def hashCode(): Int            = super.hashCode()
+      override def equals(that: Any): Boolean = super.equals(that)
+    }
+
+    case class TimepointDeclaration(tp: SimpleTPRef) extends Declaration[TPRef] with Statement {
       require(tp.delay == 0, "Cannot declare a relative timepoint.")
       override def id: Id           = tp.id
       override def toString: String = s"timepoint $id"
@@ -283,6 +294,7 @@ package object model {
     type Arg                      = core.Arg
     type ArgDeclaration           = core.ArgDeclaration
     type TPRef                    = core.TPRef
+    type SimpleTPRef              = core.SimpleTPRef
     type TimepointDeclaration     = core.TimepointDeclaration
     type Interval                 = core.Interval
     type Delay                    = core.Delay
@@ -305,11 +317,10 @@ package object model {
       def wrapped: Seq[Block]
     }
 
-    abstract class TimedAssertion(parent: Option[Ctx], name: String)
-        extends Ctx with Block {
+    abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx with Block {
 
-      val start: TPRef = new TPRef(this.id("start").toTPId)
-      val end: TPRef   = new TPRef(this.id("end").toTPId)
+      val start: SimpleTPRef = new SimpleTPRef(this.id("start").toTPId)
+      val end: SimpleTPRef   = new SimpleTPRef(this.id("end").toTPId)
 
       override val store: BlockStore[Statement] = new BlockStore[Statement]() +
         new TimepointDeclaration(start) +
@@ -437,7 +448,7 @@ package object model {
     }
 
     class BlockStore[+T <: Block] private (val blocks: Vector[T],
-                              val declarations: Map[Id, Declaration[_]]) {
+                                           val declarations: Map[Id, Declaration[_]]) {
 
       def this() = this(Vector(), Map())
 

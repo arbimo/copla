@@ -2,7 +2,7 @@ package copla.constraints.meta.stn.variables
 
 import copla.constraints.meta.CSP
 
-class TemporalInterval(val start: Timepoint, val end: Timepoint) {
+class TemporalInterval(val start: RelativeTimepoint, val end: RelativeTimepoint) {
 
   override def toString = s"[$start, $end]"
 

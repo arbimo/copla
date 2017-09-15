@@ -3,7 +3,7 @@ package copla.constraints.meta.variables
 import copla.constraints.meta.CSP
 import copla.constraints.meta.constraints.Constraint
 import copla.constraints.meta.domains.BooleanDomain
-import copla.constraints.meta.stn.variables.{TemporalDelay, Timepoint}
+import copla.constraints.meta.stn.variables.{RelativeTimepoint, TemporalDelay, Timepoint}
 
 import scala.collection.mutable
 
@@ -24,7 +24,7 @@ class VariableStore(csp: CSP, toClone: Option[VariableStore] = None) {
     case Some(base) => base.timepointsByRef.clone()
     case None       => mutable.Map()
   }
-  val distanceVariables: mutable.Map[(Timepoint, Timepoint), TemporalDelay] = toClone match {
+  val distanceVariables: mutable.Map[(RelativeTimepoint, RelativeTimepoint), TemporalDelay] = toClone match {
     case Some(base) => base.distanceVariables.clone()
     case None       => mutable.Map()
   }
@@ -59,7 +59,7 @@ class VariableStore(csp: CSP, toClone: Option[VariableStore] = None) {
     timepointsByRef(ref)
   }
 
-  def getDelayVariable(from: Timepoint, to: Timepoint): TemporalDelay = {
+  def getDelayVariable(from: RelativeTimepoint, to: RelativeTimepoint): TemporalDelay = {
     if (!distanceVariables.contains((from, to))) {
       val d = new TemporalDelay(from, to)
       distanceVariables.put((from, to), d)

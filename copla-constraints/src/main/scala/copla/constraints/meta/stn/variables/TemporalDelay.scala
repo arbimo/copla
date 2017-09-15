@@ -8,24 +8,24 @@ import copla.constraints.meta.domains.IntervalDomain
 import copla.constraints.meta.stn.constraint.MinDelay
 import copla.constraints.meta.variables.{IVar, VarWithDomain}
 
-class TemporalDelay(val from: Timepoint, val to: Timepoint) extends VarWithDomain {
+class TemporalDelay(val from: RelativeTimepoint, val to: RelativeTimepoint) extends VarWithDomain {
 
   override def domain(implicit csp: CSPView): IntervalDomain = csp.dom(this)
 
-  def <=(value: Int) = new MinDelay(from, to, value)
-  def <(value: Int)  = this <= value + 1
+  def <=(value: Int): MinDelay = to <= (from + value)
+  def <(value: Int): MinDelay  = to < (from + value)
 
-  def >=(value: Int) = new MinDelay(to, from, -value)
-  def >(value: Int)  = this >= value - 1
+  def >=(value: Int): MinDelay = to >= (from + value)
+  def >(value: Int): MinDelay  = to > (from + value)
 
-  override def ===(value: Int) = this <= value && this >= value
+  override def ===(value: Int): Constraint = this <= value && this >= value
 
   override def =!=(value: Int): Constraint = this < value || this > value
 
   override def toString = s"delay($from, $to)"
 
   override final val hashCode: Int = Objects.hash(from, to)
-  override def equals(o: Any) = o match {
+  override def equals(o: Any): Boolean = o match {
     case o: TemporalDelay => from == o.from && to == o.to
     case _                => false
   }

@@ -172,9 +172,11 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   def dom(tp: Timepoint): IntervalDomain =
     new IntervalDomain(stn.getEarliestTime(tp), stn.getLatestTime(tp))
 
-  def dom(d: TemporalDelay): IntervalDomain =
-    new IntervalDomain(stn.getMinDelay(d.from, d.to), stn.getMaxDelay(d.from, d.to))
-
+  def dom(d: TemporalDelay): IntervalDomain = {
+    val min = stn.getMinDelay(d.from.tp, d.to.tp) + d.to.delay - d.from.delay
+    val max = stn.getMaxDelay(d.from.tp, d.to.tp) + d.to.delay - d.from.delay
+    new IntervalDomain(min, max)
+  }
   def dom(v: IntVariable): Domain =
     if (domains.contains(v))
       domains(v)

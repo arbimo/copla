@@ -52,7 +52,7 @@ class JobShopWithTypesTest extends FunSuite {
       val job = jobs(i)
       csp.post(job.interval.duration === job.duration -1)
       if(job.numInJob >= 1)
-        csp.post(new Precedes(jobs(i-1), jobs(i)))
+        csp.post(jobs(i-1).interval < jobs(i).interval)
     }
 
     for(j1 <- jobs ; j2 <- jobs ; if j1 != j2) {
@@ -67,12 +67,6 @@ class JobShopWithTypesTest extends FunSuite {
     require(j1 != j2)
     override def toString = s"threat($j1, $j2)"
   }
-
-  class Precedes(j1: JobWithType, j2: JobWithType) extends MinDelay(j1.interval.end, j2.interval.start, 1) {
-    require(j1 != j2)
-    override def toString = s"precedes($j1, $j2)"
-  }
-
 }
 
 

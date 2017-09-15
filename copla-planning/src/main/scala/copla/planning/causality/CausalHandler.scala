@@ -2,7 +2,7 @@ package copla.planning.causality
 
 import copla.constraints.meta.{CSPUpdateResult, Consistent}
 import copla.constraints.meta.events.Event
-import copla.constraints.meta.stn.variables.Timepoint
+import copla.constraints.meta.stn.variables.{RelativeTimepoint, Timepoint}
 import copla.constraints.meta.types.dynamics.{BaseDynamicType, ComposedDynamicType}
 import copla.constraints.meta.types.statics.BaseType
 import copla.constraints.meta.util.Assertion._
@@ -60,7 +60,7 @@ class CausalHandler(val context: PlanningHandler, base: Option[CausalHandler] = 
   }
 
   def report : String = {
-    def time(tp: Timepoint) : String = s"$tp:${tp.domain}"
+    def time(tp: RelativeTimepoint) : String = s"$tp:${tp.domain}"
     val sb = new StringBuilder
     sb.append("%% Changes\n")
     for(c <- changes) {
