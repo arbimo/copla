@@ -55,7 +55,7 @@ trait VarWithDomain extends IVar {
 abstract class IntVariable(val ref: Option[Any]) extends VarWithDomain {
   private val id = IntVariable.next()
 
-  def initialDomain(implicit csp: CSPView): Domain
+  def initialDomain(implicit csp: CSPView): Domain // todo: check if the csp parameter can be removed
 
   def domain(implicit csp: CSPView): Domain = csp.dom(this)
 

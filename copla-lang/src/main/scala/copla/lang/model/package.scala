@@ -1,5 +1,6 @@
 package copla.lang
 
+import copla.lang
 import copla.lang.parsing.anml.Parser
 
 package object model {
@@ -190,6 +191,7 @@ package object model {
 
     /** Denotes an assertion that changes a fluent */
     sealed trait ProvidesChange { self: TimedAssertion =>
+      def valueAfterChange: Var
     }
 
     case class TimedEqualAssertion(start: TPRef, end: TPRef, fluent: Fluent, value: Var)
@@ -200,6 +202,7 @@ package object model {
     case class TimedAssignmentAssertion(start: TPRef, end: TPRef, fluent: Fluent, value: Var)
         extends TimedAssertion
         with ProvidesChange {
+      override def valueAfterChange: Var = value
       override def toString: String = s"[$start,$end] $fluent := $value"
     }
     case class TimedTransitionAssertion(start: TPRef,
@@ -210,6 +213,7 @@ package object model {
         extends TimedAssertion
         with RequiresSupport
         with ProvidesChange {
+      override def valueAfterChange: Var = to
       override def toString: String = s"[$start, $end] $fluent == $start :-> $end"
     }
 
