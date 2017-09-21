@@ -21,37 +21,26 @@ lazy val commonJVMSettings = Seq(
   scalaVersion := "2.12.3",
   exportJars := true, // insert other project dependencies in oneJar
   javaOptions in run ++= Seq("-Xmx1000m", "-ea"),
-  libraryDependencies += "org.scalatest" %%% "scalatest" % "3.0.1" % "test"
-)
-
-lazy val commonNativeSettings = Seq(
-  scalaVersion := "2.11.11",
-  nativeGC := "immix",
-  nativeMode := "release"
+  libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % "test"
 )
 
 lazy val root = project.in(file(".")).
-  aggregate(coplaLangJVM, coplaConstraints).
+  aggregate(coplaLang, coplaConstraints).
   settings(
     publish := {},
     publishLocal := {}
   )
 
 
-lazy val coplaLang = crossProject(JVMPlatform, NativePlatform)
-  .crossType(CrossType.Pure) // keep usual repository organization
+lazy val coplaLang = project
   .in(file("copla-lang"))
   .settings(name := "copla-lang")
   .settings(commonSettings: _*)
-  .jvmSettings(commonJVMSettings: _*)
-  .nativeSettings(commonNativeSettings: _*)
+  .settings(commonJVMSettings: _*)
   .settings(libraryDependencies ++= Seq(
-    "com.lihaoyi" %%% "fastparse" % "0.4.4",
-    "com.github.scopt" %%% "scopt" % "3.7.0"
+    "com.lihaoyi" %% "fastparse" % "0.4.4",
+    "com.github.scopt" %% "scopt" % "3.7.0"
   ))
-
-lazy val coplaLangJVM = coplaLang.jvm
-lazy val coplaLangNative = coplaLang.native
 
 lazy val coplaConstraints = project.in(file("copla-constraints"))
   .settings(name := "copla-constraints")
@@ -62,11 +51,11 @@ lazy val coplaConstraints = project.in(file("copla-constraints"))
   ))
 
 lazy val coplaPlanning = project.in(file("copla-planning"))
-  .dependsOn(coplaConstraints, coplaLangJVM)
+  .dependsOn(coplaConstraints, coplaLang)
   .settings(name := "copla-planning")
   .settings(commonSettings: _*)
   .settings(commonJVMSettings: _*)
   .settings(libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-    "com.github.scopt" %%% "scopt" % "3.7.0"
+    "com.github.scopt" %% "scopt" % "3.7.0"
   ))
