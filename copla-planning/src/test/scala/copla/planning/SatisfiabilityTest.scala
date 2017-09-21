@@ -1,6 +1,6 @@
 package copla.planning
 
-import copla.constraints.meta.search.TreeSearch
+import copla.constraints.meta.search.{Solution, TreeSearch}
 import copla.constraints.meta.types.statics.TypedVariable
 import copla.constraints.meta.variables.IntVariable
 import copla.constraints.meta.{CSP, Configuration}
@@ -11,7 +11,7 @@ import org.scalatest.FunSuite
 class SatisfiabilityTest extends FunSuite {
 
   test("Single sat/unsat (for debugging)") {
-    testSat(12)
+    testSat(1)
   }
 
   for (i <- Instances.satisfiables.indices) {
@@ -68,8 +68,10 @@ class SatisfiabilityTest extends FunSuite {
 
   def plan(pbString: String): CSP = {
     Utils.plan(Utils.csp(Utils.problem(pbString))) match {
-      case Left(solution) => solution
-      case _              => null
+      case Solution(solution) => solution
+      case x              =>
+        println(x)
+        null
     }
   }
 

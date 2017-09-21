@@ -1,8 +1,9 @@
 package copla.constraints.meta.search
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta._
 import copla.constraints.meta.decisions.DecisionOption
 import copla.constraints.bindings.InconsistentBindingConstraintNetwork
+import copla.constraints.meta.constraints.Inconsistency
 
 import scala.collection.mutable
 
@@ -42,21 +43,23 @@ class TreeSearch(nodes: Seq[CSP]) {
     Right(NoSolution.NO_SOLUTION)
   }
 
-  private def applyTrivialDecisions(_csp: CSP, maxDecisionsToApply: Int): CSP = {
+  private def applyTrivialDecisions(_csp: CSP, maxDecisionsToApply: Int): CSPUpdateResult = {
     implicit val csp = _csp
-    csp.propagate()
-    if (maxDecisionsToApply == 0)
-      return csp
-    for (decision <- csp.decisions.pending if decision.pending) {
-      if (decision.numOption == 0)
-        throw new InconsistentBindingConstraintNetwork()
-      else if (decision.numOption == 1) {
-        numAppliedDecisions += 1
-        decision.options.head.enforceIn(csp)
-        return applyTrivialDecisions(csp, maxDecisionsToApply - 1)
+    csp.propagate() ==> {
+      if (maxDecisionsToApply == 0)
+        Consistent
+      else {
+        csp.decisions.pending.find(dec => dec.pending && dec.numOption <= 1) match {
+          case None => Consistent
+          case Some(dec) if dec.numOption == 0 =>
+            Inconsistent("Flaw with no resolver: " + dec)
+          case Some(dec) if dec.numOption == 1 =>
+            dec.options.head.enforceIn(csp)
+            applyTrivialDecisions(csp, maxDecisionsToApply - 1)
+          case _ => FatalError("should be unreachable")
+        }
       }
     }
-    csp
   }
 
   def search(maxDepth: Int = Integer.MAX_VALUE): Either[CSP, NoSolution.Status] = {
@@ -64,12 +67,11 @@ class TreeSearch(nodes: Seq[CSP]) {
     while (queue.nonEmpty) {
 
       implicit val csp = queue.dequeue()
-//      println(" "*cur.depth + "X" + " "*(maxDepth-cur.depth-1)+"|")
+      //      println(" "*cur.depth + "X" + " "*(maxDepth-cur.depth-1)+"|")
       numExpansions += 1
-      try {
-        applyTrivialDecisions(csp, 50)
-        csp.propagate()
 
+      applyTrivialDecisions(csp, 50) ==>
+        csp.propagate() =!> {
         // variables by increasing domain size
         val decisions = csp.decisions.pending
           .filter(_.pending)
@@ -84,13 +86,10 @@ class TreeSearch(nodes: Seq[CSP]) {
         val decision = decisions.head
 
         def apply(csp: CSP, decision: DecisionOption): Option[CSP] = {
-          try {
-            decision.enforceIn(csp)
-            csp.propagate()
-            Some(csp)
-          } catch {
-            case e: InconsistentBindingConstraintNetwork =>
-              None
+          decision.enforceIn(csp)
+          csp.propagate() match {
+            case Consistent => Some(csp)
+            case _          => None
           }
         }
 
@@ -101,10 +100,6 @@ class TreeSearch(nodes: Seq[CSP]) {
             queue.enqueue(x)
           else
             maxDepthReached = true
-
-      } catch {
-        case e: InconsistentBindingConstraintNetwork =>
-        // inconsistent node, go to next
       }
     }
 

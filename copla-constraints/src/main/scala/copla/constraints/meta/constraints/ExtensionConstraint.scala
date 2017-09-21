@@ -11,6 +11,8 @@ import copla.constraints.meta.variables.{IVar, IntVariable}
 class ExtensionConstraint(_variables: Seq[IntVariable], extDomain: ExtensionDomain)
     extends Constraint {
 
+  override def toString: String = s"ext-constraint([${_variables.mkString(",")}] <=> $extDomain"
+
   override def variables(implicit csp: CSPView): Set[IVar] = _variables.toSet
 
   override def satisfaction(implicit csp: CSPView): Satisfaction = {

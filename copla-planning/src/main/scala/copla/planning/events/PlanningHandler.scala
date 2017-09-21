@@ -1,6 +1,6 @@
 package copla.planning.events
 
-import copla.constraints.meta.{CSP, CSPUpdateResult, Consistent}
+import copla.constraints.meta.{CSP, CSPUpdateResult, Consistent, FatalError}
 import copla.constraints.meta.constraints.ExtensionConstraint
 import copla.constraints.meta.domains.ExtensionDomain
 import copla.constraints.meta.events.{Event, InternalCSPEventHandler}
@@ -100,10 +100,16 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
   }
 
   def insertChronicle(chronicle: Chronicle): CSPUpdateResult = {
-    chronicle.content.foreach {
-      case x: Any if false =>
-    }
-    ???
+    Consistent ==> CSPUpdateResult.thenForEach[core.Statement](chronicle.content, {
+      case _: core.Declaration[_] =>
+        Consistent
+      case core.BindAssertion(constant, v) =>
+        val variables = (constant.params :+ v).map(variable)
+        csp.post(new ExtensionConstraint(variables, extensionDomains.getOrElseUpdate(constant.template, new ExtensionDomain(variables.size))))
+      case core.StaticEqualAssertion(left, right) =>
+        csp.post(variable(left) === variable(right))
+      case x: Any if false => FatalError("Unreachable")
+    })
   }
   //    for(c <- chronicle.bindingConstraints.asScala)  c match {
   //      case c: VarInequalityConstraint =>

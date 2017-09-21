@@ -103,6 +103,8 @@ class ExtensionDomain(val numVariables: Int) {
     assert3((0 until numVariables).forall(i => finalDomain(i).size <= originalDomains(i).size))
     finalDomain
   }
+
+  override def toString: String = "["+individualDomains.mkString(", ")+"]"
 }
 
 class TypedExtensionDomain(val types: Seq[Type[Any]])
