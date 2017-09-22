@@ -104,7 +104,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
       }
 
   val temporalConstraint: Parser[Seq[TBefore]] = {
-    (timepoint ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~/ timepoint ~ ";")
+    (timepoint ~ ("<=" | "<" | ">=" | ">" | "==" | ":=" | "=").! ~/ timepoint ~ ";")
       .map {
         case (t1, "<", t2)                                     => Seq(t1 < t2)
         case (t1, "<=", t2)                                    => Seq(t1 <= t2)
@@ -113,7 +113,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
         case (t1, eq, t2) if Set("=", "==", ":=").contains(eq) => t1 === t2
         case _                                                 => sys.error("Buggy parser implementation")
       } |
-      (delay ~ ("<" | "<=" | ">" | ">=" | "==" | ":=" | "=").! ~/ int ~ ";")
+      (delay ~ ("<=" | "<" | ">=" | ">" | "==" | ":=" | "=").! ~/ int ~ ";")
         .map {
           case (d, "<", t)                                     => Seq(d < t)
           case (d, "<=", t)                                    => Seq(d <= t)
@@ -516,13 +516,11 @@ object Parser {
     **/
   def parse(input: String, previousModel: Option[Model] = None): ParseResult = {
     def formatFailure(failure: Failure[Char, String]): ParseFailure = {
-      def toLineAndColumn(lines: Seq[String],
-                          index: Int,
-                          lineNumber: Int = 0): (String, Int, Int) =
+      def toLineAndColumn(lines: Seq[String], index: Int, lineNumber: Int = 0): (String, Int, Int) =
         lines match {
           case Seq(head, _*) if index <= head.length =>
             (lines.head, lineNumber, index)
-          case Seq(head, tail@_*) =>
+          case Seq(head, tail @ _*) =>
             toLineAndColumn(tail, index - head.length - 1, lineNumber + 1)
           case _ =>
             sys.error("Index is not in the provided lines")
