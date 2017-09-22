@@ -3,6 +3,7 @@ package copla.planning
 object Instances {
 
   val satisfiables = List(
+    "start <= start;",
     """
       |type X;
       |instance X x1, x2, x3;
@@ -158,6 +159,9 @@ object Instances {
   )
 
   val unsatisfiables = List(
+    "start < start;",
+    "start + 1 <= start;",
+    "end < start;",
     """
       |type X;
       |instance X x1, x2;

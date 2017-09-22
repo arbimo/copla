@@ -10,7 +10,7 @@ import copla.constraints.meta.util.Assertion._
 import copla.planning.causality.CausalHandler
 import copla.planning.causality.support.SupportByAction
 import copla.planning.model.{Chronicle, Problem}
-import copla.planning.structures.{Change, Holds}
+import copla.planning.structures.{CausalStruct, Change, Holds}
 import copla.planning.types.{AnmlVarType, TypeHandler}
 import copla.planning.variables.{FVar, InstanceVar, SVar, Var}
 import copla.lang.model.core
@@ -115,6 +115,14 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
           csp.post(variable(left) === variable(right))
         case core.StaticDifferentAssertion(left, right) =>
           csp.post(variable(left) =!= variable(right))
+
+        case ass: core.TimedAssertion =>
+          val structs = CausalStruct.assertionAsPlanningStructs(ass, this)
+          structs.foldLeft(Consistent: CSPUpdateResult)((status, struct) =>
+            status ==> csp.addEvent(PlanningStructureAdded(struct)))
+
+        case core.TBefore(from, to) =>
+          csp.post(tp(from) <= tp(to))
         case x: Any if false => FatalError("Unreachable")
       }
     )
