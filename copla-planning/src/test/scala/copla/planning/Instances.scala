@@ -17,6 +17,20 @@ object Instances {
     """.stripMargin,
     """
       |type X;
+      |instance X x1, x2, x3;
+      |
+      |constant X v0;
+      |constant X v1;
+      |constant X v2;
+      |constant X v3;
+      |
+      |v1 != v2;
+      |v2 != v3;
+      |v3 != v1;
+      |v0 == v3;
+    """.stripMargin,
+    """
+      |type X;
       |variable X sv;
       |instance X x1, x2;
       |
