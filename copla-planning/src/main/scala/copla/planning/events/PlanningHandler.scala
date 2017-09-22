@@ -100,16 +100,22 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
   }
 
   def insertChronicle(chronicle: Chronicle): CSPUpdateResult = {
-    Consistent ==> CSPUpdateResult.thenForEach[core.Statement](chronicle.content, {
-      case _: core.Declaration[_] =>
-        Consistent
-      case core.BindAssertion(constant, v) =>
-        val variables = (constant.params :+ v).map(variable)
-        csp.post(new ExtensionConstraint(variables, extensionDomains.getOrElseUpdate(constant.template, new ExtensionDomain(variables.size))))
-      case core.StaticEqualAssertion(left, right) =>
-        csp.post(variable(left) === variable(right))
-      case x: Any if false => FatalError("Unreachable")
-    })
+    Consistent ==> CSPUpdateResult.thenForEach[core.Statement](
+      chronicle.content, {
+        case _: core.Declaration[_] =>
+          Consistent
+        case core.BindAssertion(constant, v) =>
+          val variables = (constant.params :+ v).map(variable)
+          csp.post(
+            new ExtensionConstraint(
+              variables,
+              extensionDomains.getOrElseUpdate(constant.template,
+                                               new ExtensionDomain(variables.size))))
+        case core.StaticEqualAssertion(left, right) =>
+          csp.post(variable(left) === variable(right))
+        case x: Any if false => FatalError("Unreachable")
+      }
+    )
   }
   //    for(c <- chronicle.bindingConstraints.asScala)  c match {
   //      case c: VarInequalityConstraint =>
@@ -175,18 +181,18 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
   override def clone(newCSP: CSP): InternalCSPEventHandler =
     new PlanningHandler(newCSP, Right(this))
 
-  def report: String = ???
-  //  {
-  //    val sb = new StringBuilder
-  //    for(h <- subhandlers) {
-  //
-  //      sb.append(s"\n--------- SubHandler report: $h -------\n")
-  //      sb.append(h.report)
-  //      sb.append("---------- Actions ---------\n")
-  //      for(a <- actions.sortBy(a => tp(a.start).domain.lb)) {
-  //        sb.append(s"[${tp(a.start).domain.lb}, ${tp(a.end).domain.lb}] ${a.name}(${a.args.asScala.map(p => p.label+"="+variable(p).dom).mkString(", ")})\n")
-  //      }
-  //    }
-  //    sb.toString()
-//}
+  def report: String = {
+    val sb = new StringBuilder
+    for (h <- subhandlers) {
+      sb.append(s"\n--------- SubHandler report: $h -------\n")
+      sb.append(h.report)
+    }
+    //    sb.append("---------- Actions ---------\n")
+    //    for (a <- actions.sortBy(a => tp(a.start).domain.lb)) {
+    //      sb.append(s"[${tp(a.start).domain.lb}, ${tp(a.end).domain.lb}] ${a.name}(${a.args.asScala
+    //        .map(p => p.label + "=" + variable(p).dom)
+    //        .mkString(", ")})\n")
+    //    }
+    sb.toString()
+  }
 }
