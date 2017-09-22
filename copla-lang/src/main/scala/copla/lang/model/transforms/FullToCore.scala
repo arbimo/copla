@@ -73,7 +73,7 @@ object FullToCore {
     case x: full.StaticDifferentAssertion =>
       val (lVar, lStmts) = staticExprToVar(x.left)
       val (rVar, rStmts) = staticExprToVar(x.right)
-      lStmts ++ rStmts :+ core.StaticEqualAssertion(lVar, rVar)
+      lStmts ++ rStmts :+ core.StaticDifferentAssertion(lVar, rVar)
 
     case full.TemporallyQualifiedAssertion(interval, assertion) =>
       val (start, end, baseStatements: Seq[core.Statement]) =
