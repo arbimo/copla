@@ -31,7 +31,7 @@ object Planner extends App {
     case None    => System.exit(1); null
   }
 
-  val pb       = Utils.problem(conf.file)
+  val pb       = Problem(conf.file)
   val csp      = Utils.csp(pb)
   val searcher = new TreeSearch(List(csp))
   searcher.incrementalDeepeningSearch() match {
@@ -44,38 +44,6 @@ object Planner extends App {
 }
 
 object Utils {
-
-  def problem(anmlProblemFile: File): Problem = {
-    Parser.parse(anmlProblemFile) match {
-      case ParseSuccess(m) =>
-        Try {
-          new Problem(FullToCore.trans(m))
-        } match {
-          case Success(pb) => pb
-          case Failure(NonFatal(e)) =>
-            e.printStackTrace()
-            sys.error("Error while converting the ANML model: " + e.getLocalizedMessage)
-          case Failure(e) => throw e
-        }
-      case fail: GenFailure => throw new RuntimeException(fail.format)
-    }
-  }
-
-  def problem(anml: String): Problem = {
-    Parser.parse(anml) match {
-      case ParseSuccess(m) =>
-        Try {
-          new Problem(FullToCore.trans(m))
-        } match {
-          case Success(pb) => pb
-          case Failure(NonFatal(e)) =>
-            e.printStackTrace()
-            sys.error("Error while converting the ANML model: " + e.getLocalizedMessage)
-          case Failure(e) => throw e
-        }
-      case fail: GenFailure => throw new RuntimeException(fail.format)
-    }
-  }
 
   def csp(pb: Problem): CSP = {
     val csp = new CSP(Left(new Configuration(enforceTpAfterStart = false)))

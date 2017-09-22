@@ -6,6 +6,7 @@ import copla.constraints.meta.variables.IntVariable
 import copla.constraints.meta.{CSP, Configuration}
 import copla.lang.model.core
 import copla.planning.events.{InitPlanner, PlanningHandler}
+import copla.planning.model.Problem
 import org.scalatest.FunSuite
 
 class SatisfiabilityTest extends FunSuite {
@@ -67,9 +68,9 @@ class SatisfiabilityTest extends FunSuite {
   }
 
   def plan(pbString: String): CSP = {
-    Utils.plan(Utils.csp(Utils.problem(pbString))) match {
-      case Solution(solution) => solution
-      case x              =>
+    Utils.plan(Utils.csp(Problem(pbString))) match {
+      case Left(solution) => solution
+      case x =>
         println(x)
         null
     }

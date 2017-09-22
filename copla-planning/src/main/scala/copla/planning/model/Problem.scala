@@ -1,8 +1,17 @@
 package copla.planning.model
 
-import copla.lang.model.core._
+import java.io.File
 
-class Problem(val anml: Seq[InModuleBlock]) {
+import copla.lang.model.core._
+import copla.lang.model.transforms.CoreTransforms.ConstantAsLocalVar
+import copla.lang.model.transforms.{CoreTransforms, FullToCore}
+import copla.lang.parsing.anml.{GenFailure, ParseSuccess, Parser}
+import copla.planning.model.Problem.AnmlModel
+
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
+
+class Problem(val anml: AnmlModel) {
 
   // FIXME: ID is ignore when looking up the start timepoint
   val start: TPRef = anml
@@ -21,7 +30,49 @@ class Problem(val anml: Seq[InModuleBlock]) {
   )
 
   private val coverageTest = anml.map {
-    case x: Statement => null
+    case x: Statement      => null
     case x: Declaration[_] => null
+  }
+}
+object Problem {
+  type AnmlModel = Seq[InModuleBlock] with ConstantAsLocalVar
+
+  private def apply(fullModel: copla.lang.model.full.Model): Problem = {
+    val coreRaw  = FullToCore.trans(fullModel)
+    val withVars = CoreTransforms.replaceConstantsWithLocalVars(coreRaw)
+
+    new Problem(withVars)
+  }
+
+  def apply(anmlProblemFile: File): Problem = {
+    Parser.parse(anmlProblemFile) match {
+      case ParseSuccess(m) =>
+        Try {
+          Problem(m)
+        } match {
+          case Success(pb) => pb
+          case Failure(NonFatal(e)) =>
+            e.printStackTrace()
+            sys.error("Error while converting the ANML model: " + e.getLocalizedMessage)
+          case Failure(e) => throw e
+        }
+      case fail: GenFailure => throw new RuntimeException(fail.format)
+    }
+  }
+
+  def apply(anml: String): Problem = {
+    Parser.parse(anml) match {
+      case ParseSuccess(m) =>
+        Try {
+          Problem(m)
+        } match {
+          case Success(pb) => pb
+          case Failure(NonFatal(e)) =>
+            e.printStackTrace()
+            sys.error("Error while converting the ANML model: " + e.getLocalizedMessage)
+          case Failure(e) => throw e
+        }
+      case fail: GenFailure => throw new RuntimeException(fail.format)
+    }
   }
 }
