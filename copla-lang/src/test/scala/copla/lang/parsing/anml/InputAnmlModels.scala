@@ -18,9 +18,9 @@ object InputAnmlModels {
     "type A; fluent A sv;",
     "type A; fluent A sv();",
     "type A; instance A x; fluent A sv(A x);", // shadowing allowed (might benefit from warning)
-    "start < end;",
+    "start < end; start <= end; start >= end; start +10 == end-10;",
     "duration == 10;",
-    "end - start == 10;",
+    "end - start == 10; end - start <10; end -start > 10; end - start >= 10;",
     "timepoint t; t < 100;",
     "start -10  ==  end+5;",
     "start -10 -end +2 < 0;",
