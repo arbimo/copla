@@ -113,6 +113,8 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
                                                new ExtensionDomain(variables.size))))
         case core.StaticEqualAssertion(left, right) =>
           csp.post(variable(left) === variable(right))
+        case core.StaticDifferentAssertion(left, right) =>
+          csp.post(variable(left) =!= variable(right))
         case x: Any if false => FatalError("Unreachable")
       }
     )
