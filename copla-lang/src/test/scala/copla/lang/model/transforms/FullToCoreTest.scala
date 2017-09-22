@@ -11,7 +11,7 @@ class FullToCoreTest extends FunSuite {
         case ParseSuccess(module) =>
           println(FullToCore.trans(module).mkString("\n"))
         case x: ParseFailure =>
-          // ignore, this should be catched by the ANML parsing tests
+          // ignore, this should be caught by the ANML parsing tests
       }
     }
   }

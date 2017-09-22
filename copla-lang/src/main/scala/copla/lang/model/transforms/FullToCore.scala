@@ -3,6 +3,8 @@ package copla.lang.model.transforms
 import copla.lang.model
 import copla.lang.model._
 import copla.lang.model.full.Scope
+import landscaper.transformations.Trans
+import shapeless.Poly1
 
 object FullToCore {
 
@@ -43,7 +45,7 @@ object FullToCore {
   def trans(act: full.ActionTemplate)(implicit ctx: Context): core.ActionTemplate = {
     val statements = act.store.blocks.flatMap {
       case x: core.InActionBlock => Seq(x)
-      case x: full.Statement => trans(x)
+      case x: full.Statement     => trans(x)
     }
     core.ActionTemplate(act.name, statements)
   }
@@ -107,22 +109,17 @@ object FullToCore {
           val (coreFromValue, fromValueStatements) = staticExprToVar(fromValue)
           val (coreToValue, toValueStatements)     = staticExprToVar(toValue)
           baseStatements ++ fluentStatement ++ fromValueStatements ++ toValueStatements :+ core
-            .TimedTransitionAssertion(start,
-                                      end,
-                                      coreFluent,
-                                      coreFromValue,
-                                      coreToValue) :+
+            .TimedTransitionAssertion(start, end, coreFluent, coreFromValue, coreToValue) :+
             (start < end)
       }
   }
 
   def trans(model: full.Model, config: Config = Config()): Seq[core.InModuleBlock] = {
-
     model.store.blocks.flatMap {
       case x: core.InModuleBlock  => Seq(x)
       case x: full.Statement      => trans(x)(Context(model.scope, config))
       case x: full.ActionTemplate => Seq(trans(x)(Context(model.scope, config)))
     }
-
   }
+
 }

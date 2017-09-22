@@ -1,6 +1,7 @@
 package copla.lang
 
 import copla.lang
+import copla.lang.model.core.SimpleTPRef
 import copla.lang.parsing.anml.Parser
 
 package object model {
@@ -10,6 +11,8 @@ package object model {
   def defaultId(): String  = reservedPrefix + { nextID += 1; nextID - 1 }
 
   object core {
+    type CoreModel = Seq[InModuleBlock]
+    
     sealed trait Block         extends full.Block with InCore
     sealed trait InModuleBlock extends full.InModuleBlock with InCore
     sealed trait InActionBlock extends full.InActionBlock with InCore
@@ -175,7 +178,7 @@ package object model {
         with StaticAssertion {
       override def toString: String = super.toString
     }
-    case class BindAssertion(constant: Constant, variable: Var) extends StaticAssertion {
+    case class BindAssertion(constant: Constant, variable: LocalVar) extends StaticAssertion {
       override def toString: String = s"$constant == $variable"
     }
 
@@ -228,7 +231,7 @@ package object model {
       def ===(dur: Int): Seq[TBefore] = Seq(this <= dur, this >= dur)
     }
 
-    class TPId(val id: Id) extends AnyVal
+    case class TPId(id: Id)
     object TPId {
       implicit def asId(tpId: TPId): Id = tpId.id
     }
@@ -254,12 +257,16 @@ package object model {
 
       def -(other: TPRef) = Delay(other, this)
     }
-    class SimpleTPRef(id: TPId) extends TPRef(id, 0) {
-      override def hashCode(): Int            = super.hashCode()
-      override def equals(that: Any): Boolean = super.equals(that)
+    sealed trait SimpleTPRefWitness {
+      self: TPRef =>
+      require(delay == 0)
+    }
+    type SimpleTPRef = TPRef with SimpleTPRefWitness
+    object SimpleTPRef {
+      def apply(id: TPId): SimpleTPRef = new TPRef(id) with SimpleTPRefWitness
     }
 
-    case class TimepointDeclaration(tp: SimpleTPRef) extends Declaration[TPRef] with Statement {
+    case class TimepointDeclaration(tp: TPRef) extends Declaration[TPRef] with Statement {
       require(tp.delay == 0, "Cannot declare a relative timepoint.")
       override def id: Id           = tp.id
       override def toString: String = s"timepoint $id"
@@ -323,8 +330,8 @@ package object model {
 
     abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx with Block {
 
-      val start: SimpleTPRef = new SimpleTPRef(this.id("start").toTPId)
-      val end: SimpleTPRef   = new SimpleTPRef(this.id("end").toTPId)
+      val start: SimpleTPRef = SimpleTPRef(this.id("start").toTPId)
+      val end: SimpleTPRef   = SimpleTPRef(this.id("end").toTPId)
 
       override val store: BlockStore[Statement] = new BlockStore[Statement]() +
         new TimepointDeclaration(start) +
