@@ -231,7 +231,9 @@ package object model {
       def ===(dur: Int): Seq[TBefore] = Seq(this <= dur, this >= dur)
     }
 
-    case class TPId(id: Id)
+    case class TPId(id: Id) {
+      override def toString: String = id.toString
+    }
     object TPId {
       implicit def asId(tpId: TPId): Id = tpId.id
     }
