@@ -32,7 +32,7 @@ object CoreTransforms {
     val m1 = erase({
       case LocalVarDeclaration(v) => swaps.contains(v)
       case BindAssertion(cst, _)  => cst.template.params.isEmpty
-    }: PartialFunction[Any, Boolean])(model)
+    }: PartialFunction[Any, Boolean], model)
 
     // swap all vars to the new ones
     val m2 = rewrite(varSwapper, m1)

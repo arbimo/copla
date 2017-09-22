@@ -12,7 +12,7 @@ package object model {
 
   object core {
     type CoreModel = Seq[InModuleBlock]
-    
+
     sealed trait Block         extends full.Block with InCore
     sealed trait InModuleBlock extends full.InModuleBlock with InCore
     sealed trait InActionBlock extends full.InActionBlock with InCore

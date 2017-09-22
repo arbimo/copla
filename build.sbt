@@ -40,7 +40,7 @@ lazy val coplaLang = project
   .settings(libraryDependencies ++= Seq(
     "com.lihaoyi" %% "fastparse" % "0.4.4",
     "com.github.scopt" %% "scopt" % "3.7.0",
-    "com.github.arthur-bit-monnot" %% "landscaper" % "0.1-SNAPSHOT"
+    "com.github.arthur-bit-monnot" %% "landscaper" % "0.1"
   ))
 
 lazy val coplaConstraints = project.in(file("copla-constraints"))
