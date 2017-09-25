@@ -169,8 +169,9 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
   }
 
   /** Records the data field associated to this constraint */
-  def setDataOf[T <: ConstraintData](constraint: Constraint with WithData[T], value: T) {
+  def setDataOf[T <: ConstraintData](constraint: Constraint with WithData[T], value: T): CSPUpdateResult = {
     datas.put(constraint, value)
+    Consistent
   }
 
   /** Returns true iff a data field was previously recorded for this constraint */

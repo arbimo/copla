@@ -15,5 +15,5 @@ class DynTypedVariable[T](val typ: DynamicType[T], ref: Option[Any] = None)
 
   override def initialDomain(implicit csp: CSPView): Domain = typ.static.asDomain
 
-  def dom(implicit csp: CSP): DomainView[T] = new DomainView[T](domain, typ.static)
+  def dom(implicit csp: CSPView): DomainView[T] = new DomainView[T](domain, typ.static)
 }

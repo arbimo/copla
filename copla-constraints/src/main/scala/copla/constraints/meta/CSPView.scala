@@ -18,7 +18,10 @@ trait CSPView {
 
   def types: TypesStore
   def varStore: VariableStore
+  def constraints: ConstraintStore
   def temporalOrigin: Timepoint
+
+  def getHandler[T](clazz: Class[T]): T
 
   def +(change: Change): CSPView        = new CSPProxy(this, change)
   def ++(changes: Seq[Change]): CSPView = changes.foldLeft(this)(_ + _)
@@ -35,7 +38,10 @@ class CSPProxy(view: CSPView, change: Change) extends CSPView {
     case _                         => view.dom(v)
   }
 
-  override def varStore         = view.varStore
-  override def types            = view.types
-  def temporalOrigin: Timepoint = view.temporalOrigin
+  override def varStore                     = view.varStore
+  override def types                        = view.types
+  override def constraints: ConstraintStore = view.constraints
+  def temporalOrigin: Timepoint             = view.temporalOrigin
+
+  override def getHandler[T](clazz: Class[T]): T = view.getHandler(clazz)
 }

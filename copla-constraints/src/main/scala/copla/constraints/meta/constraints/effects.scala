@@ -11,7 +11,7 @@ sealed trait OnWatchChange       extends Change
 sealed trait OnPropagationChange extends Change
 
 case class UpdateDomain(variable: IntVariable, domain: Domain) extends OnPropagationChange
-case class Watch(constraint: Constraint)                       extends OnPostChange with OnWatchChange
+case class Watch(constraint: Constraint)                       extends OnPostChange with OnWatchChange with OnPropagationChange
 case class Post(constraint: Constraint)                        extends OnPostChange with OnPropagationChange
 case class DelegateToStn(constraint: TemporalConstraint)       extends OnPostChange
 

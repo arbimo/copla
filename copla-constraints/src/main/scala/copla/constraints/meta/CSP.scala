@@ -17,6 +17,7 @@ import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.{VariableStore, _}
 
 import scala.collection.mutable
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 sealed trait CSPUpdateResult {
@@ -55,6 +56,16 @@ object CSPUpdateResult {
   }
   implicit def computation2Result[T](c: Computation[T]): CSPUpdateResult =
     consistent ==> c
+
+  def attemptUnit(comp: => Unit): CSPUpdateResult = attempt { comp; Consistent }
+  def attempt(comp: => CSPUpdateResult): CSPUpdateResult = {
+    Try {
+      comp
+    } match {
+      case Success(x) => x
+      case Failure(NonFatal(e)) => FatalError("Failed attempt", Some(e))
+    }
+  }
 }
 import CSPUpdateResult._
 
@@ -67,7 +78,7 @@ case class Inconsistent(msg: String) extends CSPUpdateResult {
   def ok                                                         = false
   override def flatMap(res: => CSPUpdateResult): CSPUpdateResult = this
 }
-case class FatalError(msg: String) extends CSPUpdateResult {
+case class FatalError(msg: String, ex: Option[Throwable] = None) extends CSPUpdateResult {
   def ok                                                         = false
   override def flatMap(res: => CSPUpdateResult): CSPUpdateResult = this
 }
@@ -161,7 +172,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     eventHandlers += handler
   }
 
-  def getHandler[T](clazz: Class[T]): T = {
+  override def getHandler[T](clazz: Class[T]): T = {
     eventHandlers.filter(_.getClass == clazz).toList match {
       case Nil      => throw new IllegalArgumentException("No handler of such type")
       case h :: Nil => h.asInstanceOf[T]
@@ -241,6 +252,10 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           updateDomain(v, d)
         case Post(subConstraint) =>
           postSubConstraint(subConstraint, constraint)
+        case Watch(sub) =>
+          watchSubConstraint(sub, constraint)
+        case DataUpdate(c, update) =>
+          attemptUnit { update(c.data) }
       }
     }
 
@@ -273,6 +288,8 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           case Watch(subConstraint) => watchSubConstraint(subConstraint, c)
           case Post(subConstraint)  => postSubConstraint(subConstraint, c)
           case DelegateToStn(tc)    => stn.addConstraint(tc)
+          case DataInit(constraint, data) => constraints.setDataOf(constraint, data)
+          case DataUpdate(constraint, update) => attemptUnit { update(constraint.data) }
         } ==>
           propagate(c, event)
 

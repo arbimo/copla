@@ -1,6 +1,6 @@
 package copla.constraints.meta.constraints
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 
 /** A constraint with a data field maintained in the CSP instance.
   *
@@ -11,12 +11,13 @@ import copla.constraints.meta.CSP
   * */
 trait WithData[DataType <: ConstraintData] extends Constraint {
 
-  def data(implicit csp: CSP): DataType =
+  def data(implicit csp: CSPView): DataType =
     csp.constraints.dataOf(this)
 
-  def hasData(implicit csp: CSP): Boolean =
+  def hasData(implicit csp: CSPView): Boolean =
     csp.constraints.hasDataOf(this)
 
+  @deprecated("Should use the dedicated Change interface to update from propagation results.")
   def setData(d: DataType)(implicit csp: CSP) {
     csp.constraints.setDataOf(this, d)
   }
