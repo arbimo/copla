@@ -8,17 +8,17 @@ import copla.lang.model.core
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
 import org.scalatest.FunSuite
-import slogging.{LogLevel, LoggerConfig, PrintLoggerFactory}
+import slogging.{LogLevel, LoggerConfig}
 
 class SatisfiabilityTest extends FunSuite {
   LoggerConfig.factory = slogging.SLF4JLoggerFactory()
   System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
-  LoggerConfig.level = LogLevel.DEBUG
+  LoggerConfig.level = LogLevel.WARN
 
 
 
   test("Single sat/unsat (for debugging)") {
-    testSat(7)
+    testSat(9)
   }
 
   for (i <- Instances.satisfiables.indices) {

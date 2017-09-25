@@ -51,7 +51,7 @@ lazy val coplaConstraints = project.in(file("copla-constraints"))
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
     "biz.enef" %% "slogging" % "0.5.3",
     "biz.enef" %% "slogging-slf4j" % "0.5.3",
-    "org.slf4j" % "slf4j-simple" % "1.7.+"
+    "org.slf4j" % "slf4j-simple" % "1.7.12"
   ))
 
 lazy val coplaPlanning = project.in(file("copla-planning"))
