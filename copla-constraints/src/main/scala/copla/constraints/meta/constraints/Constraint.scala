@@ -1,6 +1,5 @@
 package copla.constraints.meta.constraints
 
-import copla.constraints.bindings.InconsistentBindingConstraintNetwork
 import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.events.Event
 import copla.constraints.meta.variables.IVar
@@ -26,9 +25,9 @@ trait Constraint {
   /** Returns the invert of this constraint (e.g. === for an =!= constraint) */
   def reverse: Constraint
 
-  final def isSatisfied(implicit csp: CSPView) = satisfaction == ConstraintSatisfaction.SATISFIED
+  final def isSatisfied(implicit csp: CSPView): Boolean = satisfaction == ConstraintSatisfaction.SATISFIED
 
-  final def isViolated(implicit csp: CSPView) = satisfaction == ConstraintSatisfaction.VIOLATED
+  final def isViolated(implicit csp: CSPView): Boolean = satisfaction == ConstraintSatisfaction.VIOLATED
 
   final def active(implicit csp: CSP): Boolean  = csp.constraints.isActive(this)
   final def watched(implicit csp: CSP): Boolean = csp.constraints.isWatched(this)
@@ -56,10 +55,17 @@ trait Constraint {
   }
 }
 
-class ConstraintSatisfaction
+/** Enum like trait to represent the status of a constraint in a given network. */
+sealed trait ConstraintSatisfaction
 
 object ConstraintSatisfaction {
-  object SATISFIED extends ConstraintSatisfaction
-  object VIOLATED  extends ConstraintSatisfaction
-  object UNDEFINED extends ConstraintSatisfaction
+  object SATISFIED extends ConstraintSatisfaction {
+    override val toString: String = "satisfied"
+  }
+  object VIOLATED  extends ConstraintSatisfaction {
+    override val toString: String = "violated"
+  }
+  object UNDEFINED extends ConstraintSatisfaction {
+    override val toString: String = "undefined"
+  }
 }

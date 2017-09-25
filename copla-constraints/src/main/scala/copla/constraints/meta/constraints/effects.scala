@@ -14,6 +14,10 @@ case class Watch(constraint: Constraint)                       extends OnPostCha
 case class Post(constraint: Constraint)                        extends OnPostChange with OnPropagationChange
 case class DelegateToStn(constraint: TemporalConstraint)       extends OnPostChange
 
+/** Represent the output of a propagation process. This includes,
+  * (i) a set of updates to the CSP induced by the propagation and
+  * (ii) the status of the constraint after those effects are propagated.
+  */
 sealed trait PropagationResult
 
 object PropagationResult {
@@ -24,9 +28,15 @@ object PropagationResult {
   }
 }
 
+/** Denotes that the constraint induces an inconsistency in the network. */
 object Inconsistency extends PropagationResult
 
-case class Satisfied(changes: Seq[OnPropagationChange]) extends PropagationResult
+/** Denotes that:
+  * (i) the constraint induces the provided changes to the CSP,
+  * (ii) once the changes are applied, the constraint will be satisfied.
+  * @param changes Changes to be applied to the CSP
+  */
+final case class Satisfied(changes: Seq[OnPropagationChange]) extends PropagationResult
 
 object Satisfied {
   def apply()                                                 = new Satisfied(Nil)
@@ -34,7 +44,12 @@ object Satisfied {
   def apply(c1: OnPropagationChange, c2: OnPropagationChange) = new Satisfied(c1 :: c2 :: Nil)
 }
 
-case class Undefined(changes: Seq[OnPropagationChange]) extends PropagationResult
+/** Denotes that:
+  * - the constraint induces the provided changes top the CSP
+  * - these changes are not sufficient to make the constraint satisfied or violated
+  * @param changes Changes to be applied to the CSP.
+  */
+final case class Undefined(changes: Seq[OnPropagationChange]) extends PropagationResult
 
 object Undefined {
   def apply()                                                 = new Undefined(Nil)
