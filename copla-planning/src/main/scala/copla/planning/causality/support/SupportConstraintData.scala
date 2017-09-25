@@ -1,17 +1,13 @@
 package copla.planning.causality.support
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints.{Constraint, ConstraintData}
 import copla.constraints.meta.util.Assertion._
-import copla.planning.causality.CausalHandler
-import copla.planning.events.PlanningHandler
 
 import scala.collection.mutable
 
 /** Data fields to be accessed by a SupportConstraint */
-class SupportConstraintData(_csp: CSP, base: Option[SupportConstraintData] = None) extends ConstraintData {
-
-  val context : CausalHandler = _csp.getHandler(classOf[PlanningHandler]).getHandler(classOf[CausalHandler])
+class SupportConstraintData(base: Option[SupportConstraintData] = None) extends ConstraintData {
 
   private val constraintsByDomainValue: scala.collection.mutable.Map[Int, Constraint] = base match {
     case Some(prev) => prev.constraintsByDomainValue.clone()
@@ -28,11 +24,11 @@ class SupportConstraintData(_csp: CSP, base: Option[SupportConstraintData] = Non
     domainValueByConstraint.put(subConstraint, domainValue)
   }
 
-  def hasConstraintFor(domainValue: Int) = constraintsByDomainValue.contains(domainValue)
+  def hasConstraintFor(domainValue: Int): Boolean = constraintsByDomainValue.contains(domainValue)
 
   def constraintOf(domainValue: Int) : Constraint = constraintsByDomainValue(domainValue)
 
   def indexOf(constraint: Constraint) : Int = domainValueByConstraint(constraint)
 
-  def clone(implicit context: CSP) = new SupportConstraintData(context, Some(this))
+  def clone(implicit context: CSP) = new SupportConstraintData(Some(this))
 }
