@@ -1,6 +1,7 @@
 package copla.constraints.meta.constraints
 
 import copla.constraints.meta.CSP
+import copla.constraints.meta.decisions.Decision
 import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.stn.constraint.TemporalConstraint
 import copla.constraints.meta.variables.IntVariable
@@ -18,12 +19,14 @@ case class Watch(constraint: Constraint)
 case class Post(constraint: Constraint)                  extends OnPostChange with OnPropagationChange
 case class DelegateToStn(constraint: TemporalConstraint) extends OnPostChange
 
-case class DataInit[T <: ConstraintData](constraint: Constraint with WithData[T], field: T)
+case class InitData[T <: ConstraintData](constraint: Constraint with WithData[T], field: T)
     extends OnPostChange
-case class DataUpdate[T <: ConstraintData](constraint: Constraint with WithData[T],
+case class UpdateData[T <: ConstraintData](constraint: Constraint with WithData[T],
                                            update: T => Unit)
     extends OnPropagationChange
     with OnPostChange
+
+case class AddDecision(dec: Decision) extends OnPostChange
 
 /** Represent the output of a propagation process. This includes,
   * (i) a set of updates to the CSP induced by the propagation and

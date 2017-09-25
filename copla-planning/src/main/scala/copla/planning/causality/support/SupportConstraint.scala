@@ -30,7 +30,7 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
     * Each of the constraint is then watched. */
   override def onPost(implicit csp: CSPView): Seq[OnPostChange] = {
     val d = new SupportConstraintData()
-    (super.onPost :+ DataInit(this, d)) ++ updatesFromDomain(d)
+    (super.onPost :+ InitData(this, d) :+ AddDecision(decision)) ++ updatesFromDomain(d)
   }
 
   override def variables(implicit csp: CSPView): Set[IVar] = Set(supportVar)
@@ -128,7 +128,7 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
     val dataUpdates = newConstraintsFromDomain(currentData).map {
       case (i, c) =>
         val update = (d: SupportConstraintData) => { d.put(i, c) }
-        DataUpdate(this, update)
+        UpdateData(this, update)
     }
     val additionalWatches =
       newConstraintsFromDomain(currentData).map {

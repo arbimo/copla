@@ -20,11 +20,11 @@ class ConstraintDataTest extends FunSuite with BeforeAndAfter{
     override def variables(implicit csp: CSPView): Set[IVar] = Set(v)
 
     override def onPost(implicit csp: CSPView): Seq[OnPostChange] = {
-      DataInit(this, new Counter(v.domain.size)) :: Nil
+      InitData(this, new Counter(v.domain.size)) :: Nil
     }
 
     override def propagate(event: Event)(implicit csp: CSPView): PropagationResult = {
-      val update = DataUpdate(this, (c: Counter) => c.i = v.domain.size)
+      val update = UpdateData(this, (c: Counter) => c.i = v.domain.size)
       Undefined(update)
     }
 

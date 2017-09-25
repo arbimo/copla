@@ -254,7 +254,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           postSubConstraint(subConstraint, constraint)
         case Watch(sub) =>
           watchSubConstraint(sub, constraint)
-        case DataUpdate(c, update) =>
+        case UpdateData(c, update) =>
           attemptUnit { update(c.data) }
       }
     }
@@ -287,8 +287,9 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           case Watch(subConstraint) => watchSubConstraint(subConstraint, c)
           case Post(subConstraint)  => postSubConstraint(subConstraint, c)
           case DelegateToStn(tc)    => stn.addConstraint(tc)
-          case DataInit(constraint, data) => constraints.setDataOf(constraint, data)
-          case DataUpdate(constraint, update) => attemptUnit { update(constraint.data) }
+          case InitData(constraint, data) => constraints.setDataOf(constraint, data)
+          case UpdateData(constraint, update) => attemptUnit { update(constraint.data) }
+          case AddDecision(dec) => decisions.add(dec); consistent
         } ==>
           propagate(c, event)
 
