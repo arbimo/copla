@@ -301,12 +301,6 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
             propagate(c, e)
           }) ==>
           constraints
-            .activeWatching(e.variable)
-            .forEachTry(c => {
-              assert2(c.active)
-              propagate(c, e)
-            }) ==>
-          constraints
             .monitoredWatching(e.variable)
             .forEachTry(c => {
               assert2(c.watched)
