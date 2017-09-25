@@ -2,13 +2,14 @@ package copla.constraints.meta.constraints
 
 import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints.ConstraintSatisfaction._
-import copla.constraints.meta.domains.{Domain, SingletonDomain}
+import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.events.{DomainReduced, Event, WatchedSatisfied, WatchedViolated}
+import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables._
 
 class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
 
-  val decisionVar = new IntVar(Domain(disjuncts.indices.toSet)) {
+  private val decisionVar = new IntVar(Domain(disjuncts.indices.toSet)) {
     override def toString: String = s"disjunctive-dec-var[${DisjunctiveConstraint.this}]"
   }
 
@@ -27,33 +28,41 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
   }
 
   override def propagate(event: Event)(implicit csp: CSPView) = {
-    event match {
-      case WatchedSatisfied(c) =>
-        assert(c.isSatisfied)
-        assert(decisionVar.domain.contains(disjuncts.indexOf(c)),
-               "Decision var does not contain a satisfied constraint")
-        if (decisionVar.boundTo(disjuncts.indexOf(c)))
-          Satisfied()
-        else
-          Satisfied(UpdateDomain(decisionVar, Domain(disjuncts.indexOf(c))))
-      case WatchedViolated(c) =>
-        assert(c.isViolated)
-        if (decisionVar.boundTo(disjuncts.indexOf(c)))
-          Inconsistency
-        else if (decisionVar.domain.contains(disjuncts.indexOf(c))) {
-          Undefined(UpdateDomain(decisionVar, decisionVar.domain - disjuncts.indexOf(c)))
-        } else {
+    val dom = decisionVar.domain
+    if (dom.isSingleton && disjuncts(dom.head).isSatisfied) {
+      Satisfied()
+    } else {
+      event match {
+        case WatchedSatisfied(c) =>
+          assert3(c.isSatisfied)
+          assert3(decisionVar.domain.contains(disjuncts.indexOf(c)),
+                  "Decision var does not contain a satisfied constraint")
+          val id = disjuncts.indexOf(c)
+          Satisfied(
+            UpdateDomain(decisionVar, Domain(id))
+          )
+        case WatchedViolated(c) =>
+          assert3(c.isViolated)
+          val id = disjuncts.indexOf(c)
+          if (decisionVar.boundTo(id)) {
+            Inconsistency
+          } else if (dom.contains(id)) {
+            Undefined(UpdateDomain(decisionVar, dom - id))
+          } else {
+            Undefined()
+          }
+        case DomainReduced(v) =>
+          assert3(v == decisionVar)
+          if (dom.isEmpty) {
+            Inconsistency
+          } else if (dom.isSingleton) {
+            Undefined(Post(disjuncts(dom.head)))
+          } else {
+            Undefined()
+          }
+        case _ => // ignore
           Undefined()
-        }
-      case DomainReduced(`decisionVar`) =>
-        if (decisionVar.isBound) {
-          val selectedConstraint = disjuncts(decisionVar.value)
-          Undefined(Post(selectedConstraint))
-        } else {
-          Undefined()
-        }
-      case _ =>
-        Undefined()
+      }
     }
   }
 

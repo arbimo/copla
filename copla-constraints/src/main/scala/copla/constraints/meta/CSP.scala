@@ -265,8 +265,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           setSatisfied(constraint) =!>
           assert3(constraint.isSatisfied)
       case Undefined(changes) =>
-        consistent.compute(changes.toList, applyChange) =!>
-          assert3(!constraint.isSatisfied && !constraint.isViolated)
+        consistent.compute(changes.toList, applyChange)
       case Inconsistency =>
         assert3(constraint.isViolated)
         inconsistent(s"Inconsistency detected during propagation of $constraint")
