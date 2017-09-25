@@ -56,7 +56,6 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
         assert1(c == this) // nothing to do, everything initialized in onPost
         Undefined()
       case DomainReduced(`supportVar`) =>
-        val d = data
         if (supportVar.domain.isSingleton) {
           val domainValue = supportVar.domain.values.head
           val value       = supportVar.dom.values.head
@@ -69,7 +68,7 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
               if(c.isSatisfied)
                 Satisfied()
               else
-                Undefined(Post(c))
+                Undefined(Post(c), Watch(c))
             case SupportByActionInsertion(_) =>
               sys.error(
                 "Support constraints domain is reduced to an action insertion (without the decision pending marker).")
