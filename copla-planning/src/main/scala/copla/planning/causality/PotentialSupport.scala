@@ -115,10 +115,7 @@ class ActionPotentialSupport(val act: core.ActionTemplate, private var context: 
   def report: String = {
     val sb = new StringBuilder
     sb.append(s"Supports for action $act\n")
-    var types: Any = null
     for (f <- byFunction.keys) {
-      types = typesOf(f)
-      println(types)
       sb.append("  ")
       sb.append(
         byFunction(f)

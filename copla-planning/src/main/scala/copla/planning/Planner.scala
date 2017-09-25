@@ -40,7 +40,6 @@ object Planner extends App {
     case _ =>
       println("No solution found.")
   }
-
 }
 
 object Utils {
