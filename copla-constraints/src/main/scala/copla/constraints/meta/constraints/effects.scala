@@ -1,5 +1,6 @@
 package copla.constraints.meta.constraints
 
+import copla.constraints.meta.CSP
 import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.stn.constraint.TemporalConstraint
 import copla.constraints.meta.variables.IntVariable
@@ -13,6 +14,13 @@ case class UpdateDomain(variable: IntVariable, domain: Domain) extends OnPropaga
 case class Watch(constraint: Constraint)                       extends OnPostChange with OnWatchChange
 case class Post(constraint: Constraint)                        extends OnPostChange with OnPropagationChange
 case class DelegateToStn(constraint: TemporalConstraint)       extends OnPostChange
+
+case class DataInit[T <: ConstraintData](constraint: Constraint with WithData[T], field: T)
+    extends OnPostChange
+case class DataUpdate[T <: ConstraintData](constraint: Constraint with WithData[T],
+                                           update: T => Unit)
+    extends OnPropagationChange
+    with OnPostChange
 
 /** Represent the output of a propagation process. This includes,
   * (i) a set of updates to the CSP induced by the propagation and
@@ -39,7 +47,8 @@ object Inconsistency extends PropagationResult
 final case class Satisfied(changes: Seq[OnPropagationChange]) extends PropagationResult
 
 object Satisfied {
-  def apply()                                                 = new Satisfied(Nil)
+  private val emptyInstance: Satisfied                        = new Satisfied(Nil)
+  def apply(): Satisfied                                      = emptyInstance
   def apply(change: OnPropagationChange)                      = new Satisfied(change :: Nil)
   def apply(c1: OnPropagationChange, c2: OnPropagationChange) = new Satisfied(c1 :: c2 :: Nil)
 }
@@ -52,7 +61,8 @@ object Satisfied {
 final case class Undefined(changes: Seq[OnPropagationChange]) extends PropagationResult
 
 object Undefined {
-  def apply()                                                 = new Undefined(Nil)
+  private val emptyInstance: Undefined                        = new Undefined(Nil)
+  def apply(): Undefined                                      = emptyInstance
   def apply(change: OnPropagationChange)                      = new Undefined(change :: Nil)
   def apply(c1: OnPropagationChange, c2: OnPropagationChange) = new Undefined(c1 :: c2 :: Nil)
 }
