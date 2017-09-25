@@ -36,15 +36,16 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
   override def variables(implicit csp: CSPView): Set[IVar] = Set(supportVar)
 
   override def satisfaction(implicit csp: CSPView): Satisfaction = {
-    if(supportVar.domain.isSingleton) {
+    if (supportVar.domain.isSingleton) {
       supportVar.dom.values.head match {
-        case SupportByExistingChange(c) if data.constraintOf(supportVar.domain.values.head).isSatisfied =>
+        case SupportByExistingChange(c)
+            if data.constraintOf(supportVar.domain.values.head).isSatisfied =>
           assert3(!(holds.fluent === c.fluent).isViolated)
           assert3(!(holds.value === c.value).isViolated)
           ConstraintSatisfaction.SATISFIED
         case _ => ConstraintSatisfaction.UNDEFINED
       }
-    } else if(supportVar.domain.isEmpty)
+    } else if (supportVar.domain.isEmpty)
       ConstraintSatisfaction.VIOLATED
     else
       ConstraintSatisfaction.UNDEFINED
@@ -65,7 +66,7 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
             case SupportByExistingChange(_) =>
               // actual support and decision was made (absent from domain), post the support constraint.
               val c = data.constraintOf(domainValue)
-              if(c.isSatisfied)
+              if (c.isSatisfied)
                 Satisfied()
               else
                 Undefined(Post(c), Watch(c))
@@ -124,16 +125,15 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
 
   private def updatesFromDomain(currentData: SupportConstraintData)(
       implicit csp: CSPView): Seq[OnPropagationChange with OnPostChange] = {
-    val dataUpdates = newConstraintsFromDomain(currentData).map {
+    val newConstraintsWithIndex = newConstraintsFromDomain(currentData)
+    val dataUpdates = newConstraintsWithIndex.map {
       case (i, c) =>
-        val update = (d: SupportConstraintData) => { d.put(i, c) }
-        UpdateData(this, update)
+        val updateFunction = (d: SupportConstraintData) => { d.put(i, c) }
+        UpdateData(this, updateFunction)
     }
-    val additionalWatches =
-      newConstraintsFromDomain(currentData).map {
-        case (_, c) =>
-          Watch(c)
-      }
+    val additionalWatches = newConstraintsWithIndex.map {
+      case (_, c) => Watch(c)
+    }
     dataUpdates ++ additionalWatches
   }
 
