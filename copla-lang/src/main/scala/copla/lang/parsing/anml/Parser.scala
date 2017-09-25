@@ -39,6 +39,7 @@ abstract class AnmlParser(val initialContext: Ctx) {
   val timepointKW: Parser[Unit] = word.filter(_ == "timepoint").silent.opaque("instance")
   val actionKW: Parser[Unit]    = word.filter(_ == "action").silent.opaque("action")
   val durationKW: Parser[Unit]  = word.filter(_ == "duration").silent.opaque("duration")
+  val containsKW: Parser[Unit]  = word.filter(_ == "contains").silent.opaque("contains")
   val keywords: Set[String] =
     Set("type", "instance", "action", "duration", "fluent", "variable", "predicate", "timepoint")
   val nonIdent: Set[String] = keywords
@@ -286,8 +287,14 @@ abstract class AnmlParser(val initialContext: Ctx) {
         } | (":=" ~/ rightSideExpr).map(e => TimedAssignmentAssertion(fluent, e, Some(ctx), id))))
   }
 
+  val qualifier: Parser[TemporalQualifier] =
+    (interval ~/ containsKW.!.?).map {
+      case (it, None)    => Equals(it)
+      case (it, Some(_)) => Contains(it)
+    }
+
   val temporallyQualifiedAssertion: Parser[Seq[TemporallyQualifiedAssertion]] = {
-    (interval ~/
+    (qualifier ~/
       ((("{" ~ (!"}" ~/ timedAssertion ~ ";").rep ~ "}") |
         timedAssertion.map(Seq(_)))
         ~ ";"))

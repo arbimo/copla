@@ -75,21 +75,33 @@ object FullToCore {
       val (rVar, rStmts) = staticExprToVar(x.right)
       lStmts ++ rStmts :+ core.StaticDifferentAssertion(lVar, rVar)
 
-    case full.TemporallyQualifiedAssertion(interval, assertion) =>
+    case full.TemporallyQualifiedAssertion(qualifier, assertion) =>
       val (start, end, baseStatements: Seq[core.Statement]) =
-        if (ctx.config.mergeTimepoints && assertion.name.startsWith(reservedPrefix)) {
-          // we are asked to merge timepoints and assertion was not given a name
-          // use the timepoints from the interval instead of the one of the assertion
-          (interval.start, interval.end, Seq())
-        } else {
-          (assertion.start,
-           assertion.end,
-           Seq(
-             Seq(core.TimepointDeclaration(assertion.start)),
-             Seq(core.TimepointDeclaration(assertion.end)),
-             interval.start === assertion.start,
-             interval.end === assertion.end
-           ).flatten)
+        qualifier match {
+          case full.Equals(interval) =>
+            if (ctx.config.mergeTimepoints && assertion.name.startsWith(reservedPrefix)) {
+              // we are asked to merge timepoints and assertion was not given a name
+              // use the timepoints from the interval instead of the one of the assertion
+              (interval.start, interval.end, Seq())
+            } else {
+              (assertion.start,
+                assertion.end,
+                Seq(
+                  Seq(core.TimepointDeclaration(assertion.start)),
+                  Seq(core.TimepointDeclaration(assertion.end)),
+                  interval.start === assertion.start,
+                  interval.end === assertion.end
+                ).flatten)
+            }
+          case full.Contains(interval) =>
+            (assertion.start,
+              assertion.end,
+              Seq(
+                core.TimepointDeclaration(assertion.start),
+                core.TimepointDeclaration(assertion.end),
+                interval.start <= assertion.start,
+                assertion.end <= interval.end
+              ))
         }
       assertion match {
         case full.TimedEqualAssertion(fluent, value, parent, name) =>

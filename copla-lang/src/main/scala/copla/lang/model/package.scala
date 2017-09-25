@@ -370,12 +370,20 @@ package object model {
         else s"$name: $fluent := $to"
     }
 
-    case class TemporallyQualifiedAssertion(interval: Interval, assertion: TimedAssertion)
+    trait TemporalQualifier
+    case class Equals(interval: Interval) extends TemporalQualifier {
+      override def toString: String = interval.toString
+    }
+    case class Contains(interval: Interval) extends TemporalQualifier {
+      override def toString: String = s"$interval contains"
+    }
+
+    case class TemporallyQualifiedAssertion(qualifier: TemporalQualifier, assertion: TimedAssertion)
         extends Statement
         with Wrapper {
 
       override def wrapped  = Seq(assertion)
-      override def toString = s"$interval $assertion"
+      override def toString = s"$qualifier $assertion"
     }
 
     sealed trait StaticAssertion extends Statement
