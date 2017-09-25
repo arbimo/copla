@@ -48,7 +48,10 @@ lazy val coplaConstraints = project.in(file("copla-constraints"))
   .settings(commonSettings: _*)
   .settings(commonJVMSettings: _*)
   .settings(libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+    "org.scalatest" %% "scalatest" % "3.0.1" % "test",
+    "biz.enef" %% "slogging" % "0.5.3",
+    "biz.enef" %% "slogging-slf4j" % "0.5.3",
+    "org.slf4j" % "slf4j-simple" % "1.7.+"
   ))
 
 lazy val coplaPlanning = project.in(file("copla-planning"))
@@ -58,5 +61,6 @@ lazy val coplaPlanning = project.in(file("copla-planning"))
   .settings(commonJVMSettings: _*)
   .settings(libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
-    "com.github.scopt" %% "scopt" % "3.7.0"
+    "com.github.scopt" %% "scopt" % "3.7.0",
+    "biz.enef" %% "slogging" % "0.5.3"
   ))

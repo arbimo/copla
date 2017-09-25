@@ -8,8 +8,14 @@ import copla.lang.model.core
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
 import org.scalatest.FunSuite
+import slogging.{LogLevel, LoggerConfig, PrintLoggerFactory}
 
 class SatisfiabilityTest extends FunSuite {
+  LoggerConfig.factory = slogging.SLF4JLoggerFactory()
+  System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
+  LoggerConfig.level = LogLevel.DEBUG
+
+
 
   test("Single sat/unsat (for debugging)") {
     testSat(7)
@@ -57,8 +63,6 @@ class SatisfiabilityTest extends FunSuite {
     println(pb)
     implicit val csp = plan(pb)
     if (csp != null) {
-      println("\n -------- HISTORY --------\n")
-      println(csp.log.history)
       println("\n -------- REPORT --------\n")
       println(csp.report)
 

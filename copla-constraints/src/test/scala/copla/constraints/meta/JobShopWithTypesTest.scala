@@ -24,7 +24,6 @@ class JobShopWithTypesTest extends FunSuite {
     assert(csp.isSolution)
     assert(instance.optimalMakespan.isEmpty || csp.makespan == instance.optimalMakespan.get)
 
-    println(csp.log.history)
     // println(csp.report)
     for((m, js) <- jobs.groupBy(_.machine.dom.head).toList.sortBy(_._1)) {
       print(s"$m: ")

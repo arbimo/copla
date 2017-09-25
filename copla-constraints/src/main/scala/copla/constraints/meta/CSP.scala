@@ -15,6 +15,7 @@ import copla.constraints.meta.types.events.NewInstance
 import copla.constraints.meta.types.statics.TypedVariable
 import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.{VariableStore, _}
+import slogging.{LazyLogging, StrictLogging}
 
 import scala.collection.mutable
 import scala.util.control.NonFatal
@@ -78,14 +79,18 @@ case class Inconsistent(msg: String) extends CSPUpdateResult {
   def ok                                                         = false
   override def flatMap(res: => CSPUpdateResult): CSPUpdateResult = this
 }
-case class FatalError(msg: String, ex: Option[Throwable] = None) extends CSPUpdateResult {
+case class FatalError(msg: String, ex: Option[Throwable] = None) extends CSPUpdateResult with slogging.StrictLogging {
+  ex match {
+    case Some(cause) => logger.error(msg, cause)
+    case None => logger.error(msg)
+  }
   def ok                                                         = false
   override def flatMap(res: => CSPUpdateResult): CSPUpdateResult = this
 }
 
 class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     extends Ordered[CSP]
-    with CSPView {
+    with CSPView with StrictLogging {
   implicit private val csp = this
 
   val conf: Configuration = toClone match {
@@ -107,11 +112,6 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     case Right(base) =>
       base.numberOfChildren += 1
       base.numberOfChildren
-  }
-
-  final val log: ILogger = toClone match {
-    case Right(base) => base.log.clone
-    case _           => new Logger()
   }
 
   val domains: mutable.Map[VarWithDomain, Domain] = toClone match {
@@ -199,7 +199,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   }
 
   def updateDomain(variable: IntVariable, newDomain: Domain): CSPUpdateResult = {
-    log.domainUpdate(variable, newDomain)
+    logger.debug(s"  dom-update: $variable <- $newDomain")
     if (newDomain.isEmpty) {
       fatal("empty domain update")
     } else if (variable.domain.size > newDomain.size) {
@@ -237,7 +237,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         assert1(constraints.active.isEmpty)
         assert2(constraints.watched.isEmpty)
         assert3(stn.watchedVarsByIndex.values.map(_.size).sum == 0,
-                log.history + "\n\n" + stn.watchedVarsByIndex.values.flatten)
+                stn.watchedVarsByIndex.values.flatten.toString())
       }
     } match {
       case Success(_) => consistent
@@ -273,7 +273,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   }
 
   def handleEvent(event: Event): CSPUpdateResult = {
-    log.startEventHandling(event)
+    logger.debug(s"Handling event: $event")
     constraints.handleEventFirst(event)
 
     val mainLoopResult: CSPUpdateResult = event match {
@@ -368,12 +368,11 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         stnBridge.handleEvent(event) ==>
         thenForEach[CSPEventHandler](eventHandlers, h => h.handleEvent(event)) =!>
         constraints.handleEventLast(event)
-    log.endEventHandling(event)
     result
   }
 
   def post(constraint: Constraint): CSPUpdateResult = {
-    log.constraintPosted(constraint)
+    logger.debug(s"  new-constraint: $constraint")
     addEvent(NewConstraint(constraint))
   }
 
@@ -430,7 +429,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   }
 
   def addEvent(event: Event): CSPUpdateResult = {
-    log.newEventPosted(event)
+    logger.debug(s"  new-event: $event")
     events += event
     consistent
   }

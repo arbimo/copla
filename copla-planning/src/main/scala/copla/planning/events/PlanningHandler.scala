@@ -14,16 +14,17 @@ import copla.planning.structures.{CausalStruct, Change, Holds}
 import copla.planning.types.{AnmlVarType, TypeHandler}
 import copla.planning.variables.{FVar, InstanceVar, SVar, Var}
 import copla.lang.model.core
+import slogging.StrictLogging
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
-    extends InternalCSPEventHandler {
+    extends InternalCSPEventHandler with StrictLogging {
 
   implicit val csp = _csp
 
-  def log = csp.log
+  val log = logger
 
   assert1(!csp.conf.enforceTpAfterStart,
           "Planner needs to be able some timepoints before the CSP's temporal origin.")
