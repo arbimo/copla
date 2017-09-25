@@ -382,8 +382,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   }
 
   def watchSubConstraint(subConstraint: Constraint, parent: Constraint): CSPUpdateResult = {
-    constraints.addWatcher(subConstraint, parent)
-    consistent
+    attemptUnit { constraints.addWatcher(subConstraint, parent) }
   }
 
   def reified(constraint: Constraint): ReificationVariable = {
