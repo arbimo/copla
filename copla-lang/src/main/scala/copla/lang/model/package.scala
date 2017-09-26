@@ -217,7 +217,7 @@ package object model {
         with RequiresSupport
         with ProvidesChange {
       override def valueAfterChange: Var = to
-      override def toString: String = s"[$start, $end] $fluent == $start :-> $end"
+      override def toString: String = s"[$start, $end] $fluent == $from :-> $to"
     }
 
     /*** Time ***/
@@ -344,6 +344,8 @@ package object model {
                                    parent: Option[Ctx],
                                    name: String)
         extends TimedAssertion(parent, name) {
+      if(name == "__296")
+        println(name)
       override def toString: String =
         if (name.startsWith(reservedPrefix)) s"$left == $right"
         else s"$name: $left == $right"
