@@ -44,10 +44,10 @@ object FullToCore {
 
   def trans(act: full.ActionTemplate)(implicit ctx: Context): core.ActionTemplate = {
     val statements = act.store.blocks.flatMap {
-      case x: core.InActionBlock => Seq(x)
-      case x: full.Statement     => trans(x)
+      case x: core.Statement => Seq(x)
+      case x: full.Statement => trans(x)
     }
-    core.ActionTemplate(act.name, statements)
+    core.ActionTemplate(act.scope, statements)
   }
 
   def trans(block: full.Statement)(implicit ctx: Context): Seq[core.Statement] = block match {
@@ -55,10 +55,9 @@ object FullToCore {
 
     case x: full.StaticAssignmentAssertion =>
       (x.left, x.right) match {
-        case (cst: full.Constant, inst: core.Instance)
-            if cst.params.forall(_.isInstanceOf[core.Instance]) =>
-          val boundCst = new model.core.BoundConstant(cst.template,
-                                                      cst.params.map(_.asInstanceOf[core.Instance]))
+        case (cst: full.Constant, inst: core.Instance) if cst.params.forall(_.isInstanceOf[core.Instance]) =>
+          val boundCst =
+            new model.core.BoundConstant(cst.template, cst.params.map(_.asInstanceOf[core.Instance]))
           Seq(core.StaticAssignmentAssertion(boundCst, inst))
         case _ =>
           throw new UnsupportedOperationException(
@@ -85,23 +84,23 @@ object FullToCore {
               (interval.start, interval.end, Seq())
             } else {
               (assertion.start,
-                assertion.end,
-                Seq(
-                  Seq(core.TimepointDeclaration(assertion.start)),
-                  Seq(core.TimepointDeclaration(assertion.end)),
-                  interval.start === assertion.start,
-                  interval.end === assertion.end
-                ).flatten)
+               assertion.end,
+               Seq(
+                 Seq(core.TimepointDeclaration(assertion.start)),
+                 Seq(core.TimepointDeclaration(assertion.end)),
+                 interval.start === assertion.start,
+                 interval.end === assertion.end
+               ).flatten)
             }
           case full.Contains(interval) =>
             (assertion.start,
-              assertion.end,
-              Seq(
-                core.TimepointDeclaration(assertion.start),
-                core.TimepointDeclaration(assertion.end),
-                interval.start <= assertion.start,
-                assertion.end <= interval.end
-              ))
+             assertion.end,
+             Seq(
+               core.TimepointDeclaration(assertion.start),
+               core.TimepointDeclaration(assertion.end),
+               interval.start <= assertion.start,
+               assertion.end <= interval.end
+             ))
         }
       assertion match {
         case full.TimedEqualAssertion(fluent, value, parent, name) =>

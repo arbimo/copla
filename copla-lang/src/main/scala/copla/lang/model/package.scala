@@ -1,7 +1,6 @@
 package copla.lang
 
-import copla.lang
-import copla.lang.model.core.SimpleTPRef
+import copla.lang.model.core.{InnerScope, RootScope, SimpleTPRef}
 import copla.lang.parsing.anml.Parser
 
 package object model {
@@ -15,8 +14,7 @@ package object model {
 
     sealed trait Block         extends full.Block with InCore
     sealed trait InModuleBlock extends full.InModuleBlock with InCore
-    sealed trait InActionBlock extends full.InActionBlock with InCore
-    sealed trait Statement     extends InModuleBlock with InActionBlock with full.Statement
+    sealed trait Statement     extends InModuleBlock with full.Statement
 
     sealed trait InCore
 
@@ -37,14 +35,22 @@ package object model {
       def toTPId: TPId = new TPId(this)
     }
 
-    case class Scope(path: Seq[String]) {
+    sealed trait Scope {
 
-      def +(nestedScope: String): Scope = Scope(path :+ nestedScope)
+      def +(nestedScope: String): InnerScope = InnerScope(this, nestedScope)
 
       def makeNewId(): Id = Id(this, model.defaultId())
+      def toScopedString(name: String): String = s"$this.$name"
+    }
+    object RootScope extends Scope {
+      override def toString: String = "root"
+    }
+    case class InnerScope(parent: Scope, name: String) extends Scope {
 
-      override def toString: String            = path.mkString(".")
-      def toScopedString(name: String): String = (path :+ name).mkString(".")
+      override def toString: String            = parent match {
+        case RootScope => name
+        case nonScope => s"$nonScope.$name"
+      }
     }
 
     sealed trait Declaration[T] {
@@ -106,7 +112,7 @@ package object model {
     case class Arg(id: Id, typ: Type) extends Var {
       override def toString: String = id.toString
     }
-    case class ArgDeclaration(arg: Arg) extends VarDeclaration[Arg] with InActionBlock {
+    case class ArgDeclaration(arg: Arg) extends VarDeclaration[Arg] with Statement {
       override def variable: Arg    = arg
       override def toString: String = s"${arg.typ.id} ${arg.id}"
     }
@@ -282,12 +288,31 @@ package object model {
       override def toString: String = s"$from <= $to"
     }
 
-    case class ActionTemplate(name: String, content: Seq[InActionBlock]) extends InModuleBlock {
+    case class ActionTemplate(scope: InnerScope, content: Seq[Statement]) extends InModuleBlock {
+      def name: String = scope.name
       lazy val args: Seq[Arg] = content.collect { case ArgDeclaration(a) => a }
 
       override def toString: String =
         s"action $name(${args.mkString(", ")}):" + "\n  " + content.mkString("\n  ")
+
+      /** Builds a new action instance with the given name*/
+      def instance(instanceName: String): Action = {
+        val instanceScope: InnerScope = scope.parent + instanceName
+
+        val trans: InnerScope => InnerScope = (x: InnerScope) => {
+          if(x == scope)
+            instanceScope
+          else
+            x
+        }
+
+        val instanceContent = landscaper.rewrite(trans, content)
+        Action(instanceScope, instanceContent, this)
+      }
     }
+
+    /** Instance of an action template */
+    case class Action(scope: Scope, content: Seq[Statement], template: ActionTemplate)
 
   }
 
@@ -495,7 +520,7 @@ package object model {
 
     trait Ctx {
 
-      final val scope: Scope = parent.map(_.scope + name).getOrElse(new Scope(Seq()))
+      final val scope: InnerScope = parent.map(_.scope).getOrElse(RootScope) + name
       assert(scope != null)
 
       def id(name: String): Id = new Id(scope, name)
