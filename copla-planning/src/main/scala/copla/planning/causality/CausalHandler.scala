@@ -17,7 +17,9 @@ case class SupportByExistingChange(c: Change) extends SupportOption
 case class SupportByActionInsertion(a: ActionPotentialSupport) extends SupportOption
 
 
-object DecisionPending extends SupportOption
+object DecisionPending extends SupportOption {
+  override def toString: String = "DecisionPending"
+}
 object DecisionType extends BaseType[SupportOption]("decision-type", List((DecisionPending, 0)))
 
 class CausalHandler(val context: PlanningHandler, base: Option[CausalHandler] = None) extends PlanningEventHandler {
