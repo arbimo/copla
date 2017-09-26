@@ -7,12 +7,8 @@ import copla.constraints.meta.constraints.Inconsistency
 
 import scala.collection.mutable
 
-object NoSolution extends Enumeration {
-  type Status = Value
-  val NO_SOLUTION, NO_SOLUTION_BELOW_MAX_DEPTH = Value
-}
 
-class TreeSearch(nodes: Seq[CSP]) {
+class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
 
   private var numExpansions       = 0
   private var numAppliedDecisions = 0
@@ -20,27 +16,32 @@ class TreeSearch(nodes: Seq[CSP]) {
   private var queue = mutable.PriorityQueue[CSP]()
   nodes.foreach(n => queue.enqueue(n))
 
-  def incrementalDeepeningSearch(
-      maxDepth: Int = Integer.MAX_VALUE): Either[CSP, NoSolution.Status] = {
+  def incrementalDeepeningSearch(maxDepth: Int = Integer.MAX_VALUE): SearchResult = {
+    logger.debug("Starting incremental deepening search.")
     val startTimeMs = System.currentTimeMillis()
     val backupQueue = queue.clone()
     for (i <- 0 to maxDepth) {
+      logger.debug(s"DFS up to depth $i")
       queue = backupQueue.clone()
       search(i) match {
-        case Left(solution) =>
-          println(
+        case Solution(solution) =>
+          logger.info(
             s"Solution found in ${System.currentTimeMillis() - startTimeMs}ms with $numExpansions/$numAppliedDecisions expansions/decisions up to depth $i.")
-          return Left(solution)
-        case Right(NoSolution.NO_SOLUTION)                 => return Right(NoSolution.NO_SOLUTION)
-        case Right(NoSolution.NO_SOLUTION_BELOW_MAX_DEPTH) => // continue
+          return Solution(solution)
+        case NoSolution =>
+          logger.info("Problem has no solutions")
+          return NoSolution
+        case NoSolutionBelowDepth(_) =>
+          logger.debug("No solution for this depth.")
+        // continue
       }
       if (i == maxDepth)
-        return Right(NoSolution.NO_SOLUTION_BELOW_MAX_DEPTH)
+        return NoSolutionBelowDepth(maxDepth)
     }
 
-    println(
+    logger.info(
       s"No solution found after $numExpansions expansions (in ${System.currentTimeMillis() - startTimeMs}ms)")
-    Right(NoSolution.NO_SOLUTION)
+    NoSolution
   }
 
   private def applyTrivialDecisions(_csp: CSP, maxDecisionsToApply: Int): CSPUpdateResult = {
@@ -62,7 +63,7 @@ class TreeSearch(nodes: Seq[CSP]) {
     }
   }
 
-  def search(maxDepth: Int = Integer.MAX_VALUE): Either[CSP, NoSolution.Status] = {
+  def search(maxDepth: Int = Integer.MAX_VALUE): SearchResult = {
     var maxDepthReached = false
     while (queue.nonEmpty) {
 
@@ -80,7 +81,7 @@ class TreeSearch(nodes: Seq[CSP]) {
         // no decision left, success!
         if (decisions.isEmpty) {
           println(s"Got solution of makespan: " + csp.makespan)
-          return Left(csp)
+          return Solution(csp)
         }
 
         val decision = decisions.head
@@ -100,13 +101,16 @@ class TreeSearch(nodes: Seq[CSP]) {
             queue.enqueue(x)
           else
             maxDepthReached = true
+      } match {
+        case er: FatalError => return Crash(er)
+        case _ =>
       }
     }
 
     if (maxDepthReached)
-      Right(NoSolution.NO_SOLUTION_BELOW_MAX_DEPTH)
+      NoSolutionBelowDepth(maxDepth)
     else
-      Right(NoSolution.NO_SOLUTION)
+      NoSolution
   }
 
 }
