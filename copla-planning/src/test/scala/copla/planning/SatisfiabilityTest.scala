@@ -1,6 +1,6 @@
 package copla.planning
 
-import copla.constraints.meta.search.{Solution, TreeSearch}
+import copla.constraints.meta.search.{NoSolution, SearchResult, Solution, TreeSearch}
 import copla.constraints.meta.types.statics.TypedVariable
 import copla.constraints.meta.variables.IntVariable
 import copla.constraints.meta.{CSP, Configuration}
@@ -36,8 +36,9 @@ class SatisfiabilityTest extends FunSuite {
   def testSat(i: Int) {
     val pb = Instances.satisfiables(i - 1)
     println(pb)
-    implicit val csp = plan(pb)
-    assert(csp != null)
+    val res = plan(pb)
+    assert(res.isInstanceOf[Solution], res.toString)
+    implicit val csp = res.asInstanceOf[Solution].csp
     assert(csp.isSolution, csp.report)
 
     def isInteresting(v: IntVariable) = v.ref match {
@@ -61,23 +62,21 @@ class SatisfiabilityTest extends FunSuite {
   def testUnsat(i: Int) {
     val pb = Instances.unsatisfiables(i - 1)
     println(pb)
-    implicit val csp = plan(pb)
-    if (csp != null) {
-      println("\n -------- REPORT --------\n")
-      println(csp.report)
+    plan(pb) match {
+      case NoSolution => // ok
+      case res@Solution(csp) =>
+        println("\n -------- REPORT --------\n")
+        println(csp.report)
 
-      println(csp.getHandler(classOf[PlanningHandler]).report)
+        println(csp.getHandler(classOf[PlanningHandler]).report)
+        fail(s"Expected NoSolution, got $res")
+      case x =>
+        fail(s"Expected NoSolution, got: $x")
     }
-    assert(csp == null)
   }
 
-  def plan(pbString: String): CSP = {
-    Utils.plan(Utils.csp(Problem(pbString))) match {
-      case Left(solution) => solution
-      case x =>
-        println(x)
-        null
-    }
+  def plan(pbString: String): SearchResult = {
+    Utils.plan(Utils.csp(Problem(pbString)))
   }
 
 }
