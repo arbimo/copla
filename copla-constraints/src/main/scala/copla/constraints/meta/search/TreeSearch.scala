@@ -34,6 +34,7 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
         case NoSolutionBelowDepth(_) =>
           logger.debug("No solution for this depth.")
         // continue
+        case x: Crash => return x
       }
       if (i == maxDepth)
         return NoSolutionBelowDepth(maxDepth)
