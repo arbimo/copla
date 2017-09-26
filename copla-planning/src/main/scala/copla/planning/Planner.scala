@@ -2,10 +2,10 @@ package copla.planning
 
 import java.io.File
 
-import copla.constraints.meta.search.TreeSearch
+import copla.constraints.meta.search.{BinarySearch, SearchResult, Solution, TreeSearch}
 import copla.constraints.meta.{CSP, Configuration}
 import copla.lang.model.transforms.FullToCore
-import copla.lang.parsing.anml.{GenFailure, ParseSuccess, Parser}
+import copla.lang.parsing.anml.{GenFailure, ParseResult, ParseSuccess, Parser}
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
 
@@ -35,9 +35,10 @@ object Planner extends App {
   val csp      = Utils.csp(pb)
   val searcher = new TreeSearch(List(csp))
   searcher.incrementalDeepeningSearch() match {
-    case Left(solution) =>
+    case Solution(solution) =>
       println(solution.getHandler(classOf[PlanningHandler]).report)
-    case _ =>
+    case x =>
+      println(x)
       println("No solution found.")
   }
 }
@@ -51,7 +52,7 @@ object Utils {
     csp
   }
 
-  def plan(csp: CSP) = {
+  def plan(csp: CSP): SearchResult = {
     val searcher = new TreeSearch(List(csp))
     searcher.incrementalDeepeningSearch()
   }
