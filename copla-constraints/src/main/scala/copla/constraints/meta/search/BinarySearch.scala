@@ -12,24 +12,28 @@ case class Solution(csp: CSP) extends SearchResult {
   override def isSolution = true
 }
 
-case class Failure(cause: Option[Inconsistent]) extends SearchResult {
-  override def isSolution = false
+object NoSolution extends SearchResult {
+  override def isSolution: Boolean = false
+}
+case class NoSolutionBelowDepth(depth: Int) extends SearchResult {
+  override def isSolution: Boolean = false
 }
 
 case class Crash(cause: FatalError) extends SearchResult {
   override def isSolution = false
 }
 
-object BinarySearch {
+object BinarySearch extends slogging.StrictLogging{
   var count = 0
 
-  def search(_csp: CSP, optimizeMakespan: Boolean = false): SearchResult = {
+  def search(_csp: CSP, optimizeMakespan: Boolean = false, curDepth: Int = 0): SearchResult = {
+    logger.debug(s"Depth First Search: $curDepth")
     count += 1
     implicit val csp = _csp
 
     csp.propagate() match {
       case Consistent      => // continue
-      case x: Inconsistent => return Failure(Some(x))
+      case x: Inconsistent => return NoSolution
       case x: FatalError   => return Crash(x)
     }
 
@@ -49,22 +53,26 @@ object BinarySearch {
     val base: CSP                 = csp.clone
     var res: Option[SearchResult] = None
 
+    logger.debug(s"Decision: $decision with options ${decision.options}")
+
     for (opt <- decision.options) {
+      logger.debug(s"option: $opt")
       val cloned = base.clone
       opt.enforceIn(cloned)
-      search(cloned, optimizeMakespan) match {
+      search(cloned, optimizeMakespan, curDepth+1) match {
         case Solution(sol) if !optimizeMakespan =>
           return Solution(sol)
         case Solution(sol) =>
           // enforce better makespan for future branches
           base.post(base.temporalHorizon < sol.makespan)
           res = Some(Solution(sol))
-        case x: Failure =>
-          res = res.orElse(Some(x))
+        case NoSolution =>
+        case NoSolutionBelowDepth(d) =>
+          return Crash(FatalError("NoSolutionBelowDepth is not supported in binary search."))
         case x: Crash =>
           return x
       }
     }
-    res.getOrElse(Failure(None))
+    res.getOrElse(NoSolution)
   }
 }
