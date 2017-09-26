@@ -12,7 +12,6 @@ import slogging.{LogLevel, LoggerConfig}
 
 class SatisfiabilityTest extends FunSuite {
   LoggerConfig.factory = slogging.SLF4JLoggerFactory()
-  System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE")
   LoggerConfig.level = LogLevel.WARN
 
 
