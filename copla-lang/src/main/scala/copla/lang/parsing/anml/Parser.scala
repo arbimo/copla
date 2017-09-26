@@ -277,7 +277,10 @@ abstract class AnmlParser(val initialContext: Ctx) {
 
     /** Reads an identifier or construct a default one otherwise */
     val assertionId: Parser[String] =
-      (freeIdent ~ ":" ~/ Pass) | PassWith(defaultId())
+      (freeIdent ~ ":" ~/ Pass).?.map {
+        case Some(id) => id
+        case None => defaultId()
+      }
 
     assertionId.sideEffect(id = _).silent ~
       (timedSymExpr.sideEffect(fluent = _).silent ~
