@@ -1,6 +1,7 @@
 package copla.lang.model
 
 import copla.lang.model.core.{InnerScope, RootScope, SimpleTPRef}
+import copla.lang.model.transforms.FullToCore
 import copla.lang.parsing.anml.Parser
 
 package object full {
@@ -44,6 +45,7 @@ package object full {
   }
 
   abstract class TimedAssertion(parent: Option[Ctx], name: String) extends Ctx with Block {
+    override val scope: InnerScope = parent.map(_.scope).getOrElse(RootScope) + name
 
     val start: SimpleTPRef = SimpleTPRef(this.id("start").toTPId)
     val end: SimpleTPRef   = SimpleTPRef(this.id("end").toTPId)
@@ -138,7 +140,8 @@ package object full {
                        override val store: BlockStore[InActionBlock] = new BlockStore())
       extends Ctx
       with InModuleBlock {
-    override def parent: Option[Ctx] = Some(containingModel)
+    override val parent: Some[Ctx] = Some(containingModel)
+    override val scope: InnerScope = parent.get.scope + name
 
     def +(block: InActionBlock): ActionTemplate =
       new ActionTemplate(name, containingModel, store + block)
@@ -156,8 +159,9 @@ package object full {
   }
 
   case class Model(store: BlockStore[InModuleBlock] = new BlockStore()) extends Ctx {
-    override def parent = None
-    override def name   = "_module_"
+    override def parent       = None
+    override def name         = "_module_"
+    override val scope: Scope = RootScope
 
     def +(block: InModuleBlock): Option[Model] = {
       Some(Model(store + block))
@@ -166,6 +170,9 @@ package object full {
     def ++(blocks: Seq[InModuleBlock]): Option[Model] = {
       blocks.foldLeft(Option(this))((m, block) => m.flatMap(_ + block))
     }
+
+    def asCore(opt: transforms.Config = transforms.Config()): core.CoreModel =
+      FullToCore.trans(this)
 
     override def toString: String =
       "module:\n" +
@@ -198,9 +205,7 @@ package object full {
   }
 
   trait Ctx {
-
-    final val scope: InnerScope = parent.map(_.scope).getOrElse(RootScope) + name
-    assert(scope != null)
+    def scope: Scope
 
     def id(name: String): Id = new Id(scope, name)
 

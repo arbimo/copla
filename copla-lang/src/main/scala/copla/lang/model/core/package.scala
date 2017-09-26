@@ -33,11 +33,12 @@ package object core {
 
     def +(nestedScope: String): InnerScope = InnerScope(this, nestedScope)
 
-    def makeNewId(): Id                      = Id(this, model.defaultId())
-    def toScopedString(name: String): String = s"$this.$name"
+    def makeNewId(): Id = Id(this, model.defaultId())
+    def toScopedString(name: String): String
   }
   object RootScope extends Scope {
-    override def toString: String = "root"
+    override def toString: String            = "root"
+    def toScopedString(name: String): String = name
   }
   case class InnerScope(parent: Scope, name: String) extends Scope {
 
@@ -45,6 +46,7 @@ package object core {
       case RootScope => name
       case nonScope  => s"$nonScope.$name"
     }
+    def toScopedString(name: String): String = s"$this.$name"
   }
 
   sealed trait Declaration[T] {
@@ -297,6 +299,9 @@ package object core {
   }
 
   /** Instance of an action template */
-  case class Action(scope: Scope, content: Seq[Statement], template: ActionTemplate)
+  case class Action(scope: InnerScope, content: Seq[Statement], template: ActionTemplate) {
+    def name: String   = scope.name
+    val args: Seq[Arg] = content.collect { case ArgDeclaration(a) => a }
+  }
 
 }
