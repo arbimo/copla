@@ -90,7 +90,10 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
             // enforce, the constraint is exclusive of any other support
             assert1(supportVar.domain.contains(i),
                     "A support is entailed but not in the support variable domain")
-            Satisfied(UpdateDomain(supportVar, Domain(i)))
+            if(supportVar.boundTo(i))
+              Satisfied()
+            else
+              Satisfied(UpdateDomain(supportVar, Domain(i)))
           case SupportByActionInsertion(aps) =>
             // ignore, even if it is satisfied it does not mean we have no other options
             Undefined()
@@ -148,4 +151,6 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
       holds.value === c.value &&
       holds.persists.start >= c.persists.start &&
       holds.persists.end <= c.persists.end
+
+  override def toString: String = s"support-constraint@[${holds.ref}]"
 }
