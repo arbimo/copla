@@ -40,7 +40,7 @@ lazy val coplaLang = project
   .settings(libraryDependencies ++= Seq(
     "com.lihaoyi" %% "fastparse" % "0.4.4",
     "com.github.scopt" %% "scopt" % "3.7.0",
-    "com.github.arthur-bit-monnot" %% "landscaper" % "0.1"
+    "com.github.arthur-bit-monnot" %% "landscaper" % "0.1.1"
   ))
 
 lazy val coplaConstraints = project.in(file("copla-constraints"))
@@ -62,5 +62,6 @@ lazy val coplaPlanning = project.in(file("copla-planning"))
   .settings(libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
     "com.github.scopt" %% "scopt" % "3.7.0",
-    "biz.enef" %% "slogging" % "0.5.3"
+    "biz.enef" %% "slogging" % "0.5.3",
+    "org.slf4j" % "slf4j-simple" % "1.7.12" % "optional"
   ))
