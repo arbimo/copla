@@ -8,5 +8,5 @@ class SupportVar(t: DynamicType[SupportOption], val target: Holds) extends DynTy
 
   override def isDecisionVar = false
 
-  override def toString = s"support-var@[$target]"
+  override def toString = s"support-var@[${target.ref}]"
 }

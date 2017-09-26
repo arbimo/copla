@@ -44,7 +44,7 @@ class SupportDecision(supportVar: SupportVar) extends Decision {
     }
   }
 
-  override def toString : String = s"support-decision@[${supportVar.target}"
+  override def toString : String = s"support-decision@[${supportVar.target.ref}]"
 }
 
 class PendingSupportOption(action: core.ActionTemplate, supportFor: SupportVar) extends DecisionOption {
