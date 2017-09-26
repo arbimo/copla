@@ -25,7 +25,7 @@ lazy val commonJVMSettings = Seq(
 )
 
 lazy val root = project.in(file(".")).
-  aggregate(coplaLang, coplaConstraints).
+  aggregate(coplaLang, coplaConstraints, coplaPlanning).
   settings(
     publish := {},
     publishLocal := {}
