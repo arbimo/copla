@@ -28,9 +28,11 @@ class Problem(val anml: AnmlModel) {
     anml.collect { case s: Statement => s }
   )
 
+  // TODO remove when everything is properly handled
   private val coverageTest = anml.map {
     case x: Statement      => null
     case x: Declaration[_] => null
+    case x: ActionTemplate => null
   }
 }
 object Problem {
