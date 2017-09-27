@@ -17,7 +17,7 @@ class SatisfiabilityTest extends FunSuite {
 
 
   test("Single sat/unsat (for debugging)") {
-    testSat(9)
+    testSat(16)
   }
 
   for (i <- Instances.satisfiables.indices) {
