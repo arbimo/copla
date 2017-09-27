@@ -45,35 +45,15 @@ object Problem {
     new Problem(withVars)
   }
 
-  def apply(anmlProblemFile: File): Problem = {
-    Parser.parse(anmlProblemFile) match {
-      case ParseSuccess(m) =>
-        Try {
-          Problem(m)
-        } match {
-          case Success(pb) => pb
-          case Failure(NonFatal(e)) =>
-            e.printStackTrace()
-            sys.error("Error while converting the ANML model: " + e.getLocalizedMessage)
-          case Failure(e) => throw e
-        }
-      case fail: GenFailure => throw new RuntimeException(fail.format)
-    }
+  def from(anmlProblemFile: File): copla.lang.Result[Problem] = {
+    copla.lang.parse(anmlProblemFile)
+      .map(CoreTransforms.replaceConstantsWithLocalVars)
+      .map(new Problem(_))
   }
 
-  def apply(anml: String): Problem = {
-    Parser.parse(anml) match {
-      case ParseSuccess(m) =>
-        Try {
-          Problem(m)
-        } match {
-          case Success(pb) => pb
-          case Failure(NonFatal(e)) =>
-            e.printStackTrace()
-            sys.error("Error while converting the ANML model: " + e.getLocalizedMessage)
-          case Failure(e) => throw e
-        }
-      case fail: GenFailure => throw new RuntimeException(fail.format)
-    }
+  def from(anml: String): copla.lang.Result[Problem] = {
+    copla.lang.parse(anml)
+      .map(CoreTransforms.replaceConstantsWithLocalVars)
+      .map(new Problem(_))
   }
 }

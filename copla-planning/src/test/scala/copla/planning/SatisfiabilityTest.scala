@@ -75,7 +75,13 @@ class SatisfiabilityTest extends FunSuite {
   }
 
   def plan(pbString: String): SearchResult = {
-    Utils.plan(Utils.csp(Problem(pbString)))
+    Problem.from(pbString)
+      .map(Utils.csp) match {
+      case copla.lang.Success(x) =>
+        Utils.plan(x)
+      case err =>
+        fail(err.toString)
+    }
   }
 
 }

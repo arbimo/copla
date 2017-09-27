@@ -31,8 +31,15 @@ object Planner extends App {
     case None    => System.exit(1); null
   }
 
-  val pb       = Problem(conf.file)
-  val csp      = Utils.csp(pb)
+  val csp = Problem.from(conf.file)
+    .map(Utils.csp) match {
+    case copla.lang.Success(csp) =>
+      csp
+    case err =>
+      println(err)
+      sys.exit(1)
+  }
+
   val searcher = new TreeSearch(List(csp))
   searcher.incrementalDeepeningSearch() match {
     case Solution(solution) =>
