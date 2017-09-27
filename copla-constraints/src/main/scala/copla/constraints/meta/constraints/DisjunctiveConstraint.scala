@@ -3,13 +3,13 @@ package copla.constraints.meta.constraints
 import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints.ConstraintSatisfaction._
 import copla.constraints.meta.domains.Domain
-import copla.constraints.meta.events.{DomainReduced, Event, WatchedSatisfied, WatchedViolated}
+import copla.constraints.meta.events._
 import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables._
 
 class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
 
-  private val decisionVar = new IntVar(Domain(disjuncts.indices.toSet)) {
+  val decisionVar = new IntVar(Domain(disjuncts.indices.toSet)) {
     override def toString: String = s"disjunctive-dec-var[${DisjunctiveConstraint.this}]"
   }
 
@@ -38,6 +38,7 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
           assert3(decisionVar.domain.contains(disjuncts.indexOf(c)),
                   "Decision var does not contain a satisfied constraint")
           val id = disjuncts.indexOf(c)
+          assert3(isSatisfied)
           Satisfied(
             UpdateDomain(decisionVar, Domain(id))
           )
@@ -45,23 +46,35 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
           assert3(c.isViolated)
           val id = disjuncts.indexOf(c)
           if (decisionVar.boundTo(id)) {
+            assert3(isViolated)
             Inconsistency
           } else if (dom.contains(id)) {
             Undefined(UpdateDomain(decisionVar, dom - id))
           } else {
+            assert3(isUndefined)
             Undefined()
           }
         case DomainReduced(v) =>
           assert3(v == decisionVar)
           if (dom.isEmpty) {
+            assert3(isViolated)
             Inconsistency
           } else if (dom.isSingleton) {
             Undefined(Post(disjuncts(dom.head)))
           } else {
+            assert3(isUndefined)
             Undefined()
           }
-        case _ => // ignore
-          Undefined()
+        case NewConstraint(c) => // ignore
+          assert3(c == this)
+          decisionVar.domain.values.find(i => disjuncts(i).isSatisfied) match {
+            case Some(i) =>
+              assert3(isSatisfied)
+              Satisfied(UpdateDomain(decisionVar, Domain(i)))
+            case None =>
+              assert3(!isSatisfied)
+              Undefined()
+          }
       }
     }
   }
