@@ -176,7 +176,6 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
         actions += instance
         insertChronicle(new Chronicle(instance.content)) =!> {
           csp.post(csp.temporalOrigin <= tp(instance.start))
-          csp.post(csp.temporalHorizon <= tp(instance.end))
           support match {
             case Some(supportVar) => csp.post(new SupportByAction(instance, supportVar))
             case None             =>
