@@ -29,6 +29,8 @@ trait Constraint {
 
   final def isViolated(implicit csp: CSPView): Boolean = satisfaction == ConstraintSatisfaction.VIOLATED
 
+  final def isUndefined(implicit csp: CSPView): Boolean = satisfaction == ConstraintSatisfaction.UNDEFINED
+
   final def active(implicit csp: CSP): Boolean  = csp.constraints.isActive(this)
   final def watched(implicit csp: CSP): Boolean = csp.constraints.isWatched(this)
 
