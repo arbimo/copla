@@ -13,12 +13,11 @@ import scala.util.{Failure, Success, Try}
 
 class Problem(val anml: AnmlModel) {
 
-  // FIXME: ID is ignore when looking up the start timepoint
   val start: TPRef = anml
-    .collectFirst { case TimepointDeclaration(tp) if tp.id.name == "start" => tp }
+    .collectFirst { case TimepointDeclaration(tp) if tp.id.id == Id(RootScope, "start") => tp }
     .getOrElse(sys.error("No start timepoint in ANML module"))
   val end: TPRef = anml
-    .collectFirst { case TimepointDeclaration(tp) if tp.id.name == "end" => tp }
+    .collectFirst { case TimepointDeclaration(tp) if tp.id.id == Id(RootScope, "end") => tp }
     .getOrElse(sys.error("No end timepoint in ANML module"))
 
   lazy val actionTemplates: Seq[ActionTemplate] = anml.collect {
