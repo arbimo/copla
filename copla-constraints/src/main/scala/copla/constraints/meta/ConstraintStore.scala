@@ -1,6 +1,6 @@
 package copla.constraints.meta
 
-import copla.constraints.meta.constraints.{Constraint, ConstraintData, WithData}
+import copla.constraints.meta.constraints._
 import copla.constraints.meta.events._
 import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.IVar
@@ -64,8 +64,7 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
       active -= constraint
       satisfied += constraint
       for (v <- constraint.variables) {
-        assert(
-          activeConstraintsForVar.contains(v) && activeConstraintsForVar(v).contains(constraint))
+        assert2(activeConstraintsForVar.contains(v) && activeConstraintsForVar(v).contains(constraint))
         activeConstraintsForVar(v) -= constraint
         if (activeConstraintsForVar(v).isEmpty)
           activeConstraintsForVar -= v
@@ -75,16 +74,27 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
       removeWatcher(watched, constraint)
   }
 
-  def addWatcher(constraint: Constraint, watcher: Constraint) {
-    if (!watchers.contains(constraint)) {
+  def addWatcher(constraint: Constraint, watcher: Constraint): CSPUpdateResult = {
+    val introductionResult = if (!watchers.contains(constraint)) {
       // constraint is not watched yet, record its variable and notify other components
       watchers.put(constraint, mutable.ArrayBuffer())
       for (v <- constraint.variables)
         watchedConstraintsForVar.getOrElseUpdate(v, mutable.ArrayBuffer()) += constraint
-      csp.addEvent(WatchConstraint(constraint))
+
+      csp.addEvent(WatchConstraint(constraint)) ==>
+        CSPUpdateResult.thenForEach[OnWatchChange](constraint.onWatch, {
+          case Watch(subConstraint) =>
+            addWatcher(subConstraint, constraint)
+        })
+    } else {
+      CSPUpdateResult.consistent
     }
-    watchers(constraint) += watcher
-    watches.getOrElseUpdate(watcher, mutable.ArrayBuffer()) += constraint
+    introductionResult =!> {
+      watchers(constraint) += watcher
+      watches.getOrElseUpdate(watcher, mutable.ArrayBuffer()) += constraint
+      assert2(watchers(constraint).contains(watcher))
+      assert2(watches(watcher).contains(constraint))
+    }
   }
 
   private def removeWatcher(constraint: Constraint, watcher: Constraint) {
