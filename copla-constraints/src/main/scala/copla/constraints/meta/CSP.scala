@@ -236,7 +236,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         "Satisfaction of an active constraint is not UNDEFINED:\n " +
           constraints.active
             .collect {
-              case c if c.satisfaction != ConstraintSatisfaction.UNDEFINED => c + " : " + c.satisfaction
+              case c if c.isUndefined => c + " : " + c.satisfaction
             }
             .mkString("\n")
       )
@@ -263,13 +263,14 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         case Post(subConstraint) =>
           postSubConstraint(subConstraint, constraint)
         case Watch(sub) =>
-          watchSubConstraint(sub, constraint)
+          constraints.addWatcher(sub, constraint)
         case UpdateData(c, update) =>
           attemptUnit { update(c.data) }
       }
     }
-
-    constraint.propagate(event) match {
+    val propagationResult = constraint.propagate(event)
+    logger.debug(s"Propagation of $constraint ==> $propagationResult")
+    propagationResult match {
       case Satisfied(changes) =>
         consistent.compute(changes.toList, applyChange) =!>
           setSatisfied(constraint) =!>
@@ -294,7 +295,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           case _                                      =>
         }
         c.onPost.forEachTry {
-          case Watch(subConstraint)           => watchSubConstraint(subConstraint, c)
+          case Watch(subConstraint)           => constraints.addWatcher(subConstraint, c)
           case Post(subConstraint)            => postSubConstraint(subConstraint, c)
           case DelegateToStn(tc)              => stn.addConstraint(tc)
           case InitData(constraint, data)     => constraints.setDataOf(constraint, data)
@@ -357,10 +358,8 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         else
           consistent
       case WatchConstraint(c) => // not watched yet
-        c.onWatch.forEachTry {
-          case Watch(subConstraint) =>
-            watchSubConstraint(subConstraint, c)
-        }
+        logger.warn("WatchConstraint directive of a constraint that was not previously recorded.")
+        consistent
 
       case UnwatchConstraint(_) => consistent // handled by constraint store
       case _: NewInstance[_]    => consistent
@@ -382,10 +381,6 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
 
   def postSubConstraint(constraint: Constraint, parent: Constraint): CSPUpdateResult = {
     post(constraint) // TODO, record relationship
-  }
-
-  def watchSubConstraint(subConstraint: Constraint, parent: Constraint): CSPUpdateResult = {
-    attemptUnit { constraints.addWatcher(subConstraint, parent) }
   }
 
   def reified(constraint: Constraint): ReificationVariable = {
