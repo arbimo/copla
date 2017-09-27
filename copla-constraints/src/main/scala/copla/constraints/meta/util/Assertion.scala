@@ -21,7 +21,7 @@ import scala.annotation.elidable._
 object Assertion {
 
   /** By default, debug level is set to 3 if java assertions are enabled (with VM option "-ea") and 1 otherwise */
-  var DEBUG_LEVEL =
+  var DEBUG_LEVEL: Int =
     if (ManagementFactory.getRuntimeMXBean.getInputArguments.contains("-ea"))
       3
     else
