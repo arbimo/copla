@@ -302,6 +302,14 @@ package object core {
   case class Action(scope: InnerScope, content: Seq[Statement], template: ActionTemplate) {
     def name: String   = scope.name
     val args: Seq[Arg] = content.collect { case ArgDeclaration(a) => a }
+
+    lazy val start: TPRef = content.collectFirst {
+      case TimepointDeclaration(tp) if tp.id.id == Id(scope, "start") => tp
+    }.getOrElse(sys.error("No start timepoint in this action"))
+
+    lazy val end: TPRef = content.collectFirst {
+      case TimepointDeclaration(tp) if tp.id.id == Id(scope, "end") => tp
+    }.getOrElse(sys.error("No end timepoint in this action"))
   }
 
 }
