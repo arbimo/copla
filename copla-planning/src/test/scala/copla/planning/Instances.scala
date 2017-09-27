@@ -83,64 +83,64 @@ object Instances {
     """
       |end = start + 30;
       |
+    """.stripMargin,
+    """
+      |type X;
+      |type Y;
+      |fluent X sv(Y y);
+      |instance X x1, x2;
+      |instance Y y1, y2, y3;
+      |
+      |action A(X x, Y y) {
+      |  [start] sv(y) := x;
+      |};
+    """.stripMargin,
+    """
+      |type X;
+      |type Y;
+      |fluent X sv(Y y);
+      |fluent boolean sv2;
+      |instance X x1, x2;
+      |instance Y y1, y2, y3;
+      |
+      |action A(X x, Y y) {
+      |  [start] sv(y2) := x;
+      |  [end] sv2 := true;
+      |};
+    """.stripMargin,
+    """
+      |fluent boolean sv2;
+      |
+      |action A() {
+      |  [end] sv2 := true;
+      |};
+      |[end] sv2 == true;
+    """.stripMargin,
+    """
+      |type X;
+      |instance X x1, x2, x3;
+      |fluent boolean sv2(X x);
+      |
+      |action A(X x) {
+      |  [end] sv2(x) := true;
+      |};
+      |[end] sv2(x1) == true;
+      |[end] sv2(x2) == true;
+      |[end] sv2(x3) == true;
+    """.stripMargin,
+    """
+      |type X;
+      |instance X x1, x2, x3;
+      |fluent boolean sv2(X x);
+      |
+      |action A(X x) {
+      |  [end] sv2(x) := true;
+      |};
+      |action B(X x) {
+      |  [start, end] sv2(x) == true :-> false;
+      |};
+      |[end] sv2(x1) == true;
     """.stripMargin
-//    ,"""
-//      |type X;
-//      |type Y;
-//      |fluent X sv(Y y);
-//      |instance X x1, x2;
-//      |instance Y y1, y2, y3;
-//      |
-//      |action A(X x, Y y) {
-//      |  [start] sv(y) := x;
-//      |};
-//    """.stripMargin,
-//    """
-//      |type X;
-//      |type Y;
-//      |fluent X sv(Y y);
-//      |fluent boolean sv2;
-//      |instance X x1, x2;
-//      |instance Y y1, y2, y3;
-//      |
-//      |action A(X x, Y y) {
-//      |  [start] sv(y2) := x;
-//      |  [end] sv2 := true;
-//      |};
-//    """.stripMargin,
-//    """
-//      |fluent boolean sv2;
-//      |
-//      |action A() {
-//      |  [end] sv2 := true;
-//      |};
-//      |[end] sv2 == true;
-//    """.stripMargin,
-//    """
-//      |type X;
-//      |instance X x1, x2, x3;
-//      |fluent boolean sv2(X x);
-//      |
-//      |action A(X x) {
-//      |  [end] sv2(x) := true;
-//      |};
-//      |[end] sv2(x1) == true;
-//      |[end] sv2(x2) == true;
-//      |[end] sv2(x3) == true;
-//    """.stripMargin,
-//    """
-//      |type X;
-//      |instance X x1, x2, x3;
-//      |fluent boolean sv2(X x);
-//      |
-//      |action A(X x) {
-//      |  [end] sv2(x) := true;
-//      |};
-//      |action B(X x) {
-//      |  [start, end] sv2(x) == true :-> false;
-//      |};
-//      |[end] sv2(x1) == true;
-//    """.stripMargin,
 //    """  // planning can result in an infinite loop
 //      |type X;
 //      |instance X x1, x2, x3;

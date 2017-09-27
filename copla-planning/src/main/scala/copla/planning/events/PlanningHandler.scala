@@ -16,11 +16,11 @@ import copla.planning.variables.{FVar, InstanceVar, SVar, Var}
 import copla.lang.model.core
 import slogging.StrictLogging
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
-    extends InternalCSPEventHandler with StrictLogging {
+    extends InternalCSPEventHandler
+    with StrictLogging {
 
   implicit val csp = _csp
 
@@ -54,11 +54,11 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
     case Right(prev) => prev.types
   }
 
-  //  val actions: mutable.ArrayBuffer[Action] = base match { TODO
-  //    case Right(prev) => prev.actions.clone()
-  //    case Left(_) => mutable.ArrayBuffer()
-  //  }
-  //
+  val actions: mutable.ArrayBuffer[core.Action] = base match {
+    case Right(prev) => prev.actions.clone()
+    case Left(_)     => mutable.ArrayBuffer()
+  }
+
   val extensionDomains: mutable.Map[core.ConstantTemplate, ExtensionDomain] = base match {
     case Right(prev) => prev.extensionDomains.clone()
     case Left(_)     => mutable.Map()
@@ -108,10 +108,9 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
         case core.BindAssertion(constant, v) =>
           val variables = (constant.params :+ v).map(variable)
           csp.post(
-            new ExtensionConstraint(
-              variables,
-              extensionDomains.getOrElseUpdate(constant.template,
-                                               new ExtensionDomain(variables.size))))
+            new ExtensionConstraint(variables,
+                                    extensionDomains.getOrElseUpdate(constant.template,
+                                                                     new ExtensionDomain(variables.size))))
         case core.StaticEqualAssertion(left, right) =>
           csp.post(variable(left) === variable(right))
         case core.StaticDifferentAssertion(left, right) =>
@@ -172,16 +171,18 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
         csp.addEvent(ChronicleAdded(pb.chronicle))
       case ChronicleAdded(chronicle) =>
         insertChronicle(chronicle)
-      case ActionInsertion(actionTemplate, support) => ??? //TODO
-//            val act = Factory.getStandaloneAction(pb, actionTemplate, RefCounter.getGlobalCounter)
-//            actions += act
-//            insertChronicle(act.chronicle)
-//            csp.post(csp.temporalOrigin <= tp(act.start))
-//            support match {
-//              case Some(supportVar) => csp.post(new SupportByAction(act, supportVar))
-//              case None =>
-//            }
-      case e: PlanningStructureAdded => Consistent
+      case ActionInsertion(actionTemplate, support) =>
+        val instance = actionTemplate.instance(actionTemplate.name+"_"+actions.size)
+        actions += instance
+        insertChronicle(new Chronicle(instance.content)) =!> {
+          csp.post(csp.temporalOrigin <= tp(instance.start))
+          csp.post(csp.temporalHorizon <= tp(instance.end))
+          support match {
+            case Some(supportVar) => csp.post(new SupportByAction(instance, supportVar))
+            case None             =>
+          }
+        }
+      case _: PlanningStructureAdded => Consistent
       case event: PlanningEvent =>
         throw new NotImplementedError(s"The event $event is not handle")
       case _ => Consistent // not concerned by this event
@@ -198,12 +199,11 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
       sb.append(s"\n--------- SubHandler report: $h -------\n")
       sb.append(h.report)
     }
-    //    sb.append("---------- Actions ---------\n")
-    //    for (a <- actions.sortBy(a => tp(a.start).domain.lb)) {
-    //      sb.append(s"[${tp(a.start).domain.lb}, ${tp(a.end).domain.lb}] ${a.name}(${a.args.asScala
-    //        .map(p => p.label + "=" + variable(p).dom)
-    //        .mkString(", ")})\n")
-    //    }
+    sb.append("---------- Actions ---------\n")
+    for (a <- actions.sortBy(a => tp(a.start).domain.lb)) {
+      val argsString = a.args.map(a => variable(a).dom).mkString(", ")
+      sb.append(s"[${tp(a.start).domain.lb}, ${tp(a.end).domain.lb}] ${a.name}($argsString)\n")
+    }
     sb.toString()
   }
 }
