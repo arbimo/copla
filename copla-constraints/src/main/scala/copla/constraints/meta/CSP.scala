@@ -63,7 +63,7 @@ object CSPUpdateResult {
     Try {
       comp
     } match {
-      case Success(x) => x
+      case Success(x)           => x
       case Failure(NonFatal(e)) => FatalError("Failed attempt", Some(e))
     }
   }
@@ -79,10 +79,12 @@ case class Inconsistent(msg: String) extends CSPUpdateResult {
   def ok                                                         = false
   override def flatMap(res: => CSPUpdateResult): CSPUpdateResult = this
 }
-case class FatalError(msg: String, ex: Option[Throwable] = None) extends CSPUpdateResult with slogging.StrictLogging {
+case class FatalError(msg: String, ex: Option[Throwable] = None)
+    extends CSPUpdateResult
+    with slogging.StrictLogging {
   ex match {
     case Some(cause) => logger.error(msg, cause)
-    case None => logger.error(msg)
+    case None        => logger.error(msg)
   }
   def ok                                                         = false
   override def flatMap(res: => CSPUpdateResult): CSPUpdateResult = this
@@ -90,7 +92,8 @@ case class FatalError(msg: String, ex: Option[Throwable] = None) extends CSPUpda
 
 class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     extends Ordered[CSP]
-    with CSPView with StrictLogging {
+    with CSPView
+    with StrictLogging {
   implicit private val csp = this
 
   val conf: Configuration = toClone match {
@@ -228,8 +231,15 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   def sanityCheck(): CSPUpdateResult = {
     Try {
       assert1(events.isEmpty, "Can't sanity check: CSP has pending events")
-      assert3(constraints.active.forall(c => c.satisfaction == ConstraintSatisfaction.UNDEFINED),
-              "Satisfaction of an active constraint is not UNDEFINED")
+      assert3(
+        constraints.active.forall(c => c.satisfaction == ConstraintSatisfaction.UNDEFINED),
+        "Satisfaction of an active constraint is not UNDEFINED:\n " +
+          constraints.active
+            .collect {
+              case c if c.satisfaction != ConstraintSatisfaction.UNDEFINED => c + " : " + c.satisfaction
+            }
+            .mkString("\n")
+      )
       assert3(constraints.satisfied.forall(_.isSatisfied),
               "A constraint is not satisfied while in the satisfied list")
 
@@ -284,12 +294,12 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           case _                                      =>
         }
         c.onPost.forEachTry {
-          case Watch(subConstraint) => watchSubConstraint(subConstraint, c)
-          case Post(subConstraint)  => postSubConstraint(subConstraint, c)
-          case DelegateToStn(tc)    => stn.addConstraint(tc)
-          case InitData(constraint, data) => constraints.setDataOf(constraint, data)
+          case Watch(subConstraint)           => watchSubConstraint(subConstraint, c)
+          case Post(subConstraint)            => postSubConstraint(subConstraint, c)
+          case DelegateToStn(tc)              => stn.addConstraint(tc)
+          case InitData(constraint, data)     => constraints.setDataOf(constraint, data)
           case UpdateData(constraint, update) => attemptUnit { update(constraint.data) }
-          case AddDecision(dec) => decisions.add(dec); consistent
+          case AddDecision(dec)               => decisions.add(dec); consistent
         } ==>
           propagate(c, event)
 
