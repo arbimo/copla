@@ -116,6 +116,13 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
         case core.StaticDifferentAssertion(left, right) =>
           csp.post(variable(left) =!= variable(right))
 
+        case core.StaticAssignmentAssertion(left, right) =>
+          val func = left.template
+          assert1((left.params :+ right).forall(variable(_).domain.isSingleton))
+          val values = (left.params :+ right).map(variable(_).domain.head)
+          extensionDomains.getOrElseUpdate(func, new ExtensionDomain(values.size)).addTuple(values)
+          Consistent
+
         case ass: core.TimedAssertion =>
           val structs = CausalStruct.assertionAsPlanningStructs(ass, this)
           structs.foldLeft(Consistent: CSPUpdateResult)((status, struct) =>
@@ -123,7 +130,6 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
 
         case core.TBefore(from, to) =>
           csp.post(tp(from) <= tp(to))
-        case x: Any if false => FatalError("Unreachable")
       }
     )
   }
