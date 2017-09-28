@@ -39,7 +39,7 @@ object CausalStruct {
           new TemporalInterval(p.tp(statement.end), p.csp.varStore.getTimepoint()),
           statement
         )
-        Seq(hold, change)
+        Seq(hold, change, PlanningConstraint(change.changing.start < change.changing.end))
 
       case statement: core.TimedAssignmentAssertion =>
         val endPersist = p.csp.varStore.getTimepoint()
