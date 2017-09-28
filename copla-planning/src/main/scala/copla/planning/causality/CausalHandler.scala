@@ -8,7 +8,7 @@ import copla.constraints.meta.types.statics.BaseType
 import copla.constraints.meta.util.Assertion._
 import copla.planning.causality.support.SupportConstraint
 import copla.planning.events.{PlanningEventHandler, PlanningHandler, PlanningStructureAdded}
-import copla.planning.structures.{CausalStruct, Change, Holds}
+import copla.planning.structures._
 
 import scala.collection.mutable
 
@@ -64,13 +64,17 @@ class CausalHandler(val context: PlanningHandler, base: Option[CausalHandler] = 
   def report : String = {
     def time(tp: RelativeTimepoint) : String = s"$tp:${tp.domain}"
     val sb = new StringBuilder
-    sb.append("%% Changes\n")
-    for(c <- changes) {
-      sb.append(s"${c.fluent}:=${c.value} -- change:]${time(c.changing.start)}, ${time(c.changing.end)}[ -- persist:[${time(c.persists.start)}, ${time(c.persists.end)}]\n")
-    }
-    sb.append("%% Holds\n")
-    for(c <- holds) {
-      sb.append(s"${c.fluent}==${c.value} -- persist:[${time(c.persists.start)}, ${time(c.persists.end)}]\n")
+    sb ++= "-------- State Variables --------\n"
+    val changesByFluents: Seq[(String, String)] = changes.groupBy(c => c.fluent.format).mapValues(changes =>
+        changes.map(c => (c.persists, c.value)).sortBy(_._1.start.tp.domain.lb)
+          .map(c => s"[${c._1.start.tp.domain.lb}, ${c._1.end.tp.domain.lb}] ${c._2.dom}")
+          .mkString(" -> ")
+    ).toSeq.sorted
+    for(timeline <- changesByFluents) {
+      sb.append(timeline._1)
+      sb.append(":   ")
+      sb.append(timeline._2)
+      sb.append("\n")
     }
     sb.toString()
   }
@@ -92,7 +96,9 @@ class CausalHandler(val context: PlanningHandler, base: Option[CausalHandler] = 
         for(c <- changes)
           csp.post(Threat(c, s))
         changes += s
-      case PlanningStructureAdded(_: CausalStruct) => throw new NotImplementedError()
+      case PlanningStructureAdded(PlanningConstraint(c)) =>
+        csp.post(c)
+      case PlanningStructureAdded(_: PStruct) => ???
 
       case _ => // not a causal structure, ignore
     }
