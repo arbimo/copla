@@ -48,6 +48,9 @@ lazy val coplaConstraints = project.in(file("copla-constraints"))
   .settings(commonSettings: _*)
   .settings(commonJVMSettings: _*)
   .settings(libraryDependencies ++= Seq(
+    "com.chuusai" %% "shapeless" % "2.3.2",
+    "com.lihaoyi" %% "sourcecode" % "0.1.4",
+    "org.typelevel" %% "cats-core" % "1.0.0-MF",
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
     "biz.enef" %% "slogging" % "0.5.3",
     "biz.enef" %% "slogging-slf4j" % "0.5.3",
