@@ -4,17 +4,16 @@ import java.io.File
 
 import copla.constraints.meta.search.{BinarySearch, SearchResult, Solution, TreeSearch}
 import copla.constraints.meta.{CSP, Configuration}
-import copla.lang.model.transforms.FullToCore
-import copla.lang.parsing.anml.{GenFailure, ParseResult, ParseSuccess, Parser}
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
 
-import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
 
 case class Config(file: File = new File("."))
 
 object Planner extends App {
+
+  slogging.LoggerConfig.factory = slogging.SLF4JLoggerFactory()
+  slogging.LoggerConfig.level = slogging.LogLevel.INFO
 
   val parser = new scopt.OptionParser[Config]("copla") {
     head("copla")
@@ -40,8 +39,9 @@ object Planner extends App {
       sys.exit(1)
   }
 
-  val searcher = new TreeSearch(List(csp))
-  searcher.incrementalDeepeningSearch() match {
+  val planningResult = Utils.plan(csp)
+
+  planningResult match {
     case Solution(solution) =>
       println(solution.getHandler(classOf[PlanningHandler]).report)
     case x =>
@@ -62,5 +62,6 @@ object Utils {
   def plan(csp: CSP): SearchResult = {
     val searcher = new TreeSearch(List(csp))
     searcher.incrementalDeepeningSearch()
+//    BinarySearch.search(csp)
   }
 }

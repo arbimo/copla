@@ -23,7 +23,7 @@ case class Crash(cause: FatalError) extends SearchResult {
   override def isSolution = false
 }
 
-object BinarySearch extends slogging.StrictLogging{
+object BinarySearch extends slogging.StrictLogging {
   var count = 0
 
   def search(_csp: CSP, optimizeMakespan: Boolean = false, curDepth: Int = 0): SearchResult = {
