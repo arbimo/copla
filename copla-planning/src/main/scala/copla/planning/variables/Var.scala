@@ -44,4 +44,8 @@ class SVar(val func: FVar, val params: Seq[Var], ref: core.Function)
       super.===(svar)
     else
       new Contradiction
+
+  def format(implicit csp: CSPView): String = {
+    s"${func.dom}(${params.map(_.dom).mkString(", ")})"
+  }
 }
