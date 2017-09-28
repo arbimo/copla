@@ -18,7 +18,7 @@ import copla.planning.structures.{Change, Holds}
 /** Constraint enforcing the given `holds` to be supported by a Change. */
 class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
     extends Constraint
-    with WithData[SupportConstraintData] {
+    with WithData[SupportConstraintData] with slogging.LazyLogging {
 
   /** Variable denoting which supports are possible.
     *  Each value of the domain corresponds to a change in the CausalHandler */
@@ -88,12 +88,15 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
         support match {
           case SupportByExistingChange(change) =>
             // enforce, the constraint is exclusive of any other support
-            assert1(supportVar.domain.contains(i),
-                    "A support is entailed but not in the support variable domain")
-            if(supportVar.boundTo(i))
+            if(!supportVar.domain.contains(i)) {
+              assert3(isSatisfied)
+              logger.warn("A support is entailed but not in the support variable domain. THis branch should be a dead-end.")
               Satisfied()
-            else
+            } else if(supportVar.boundTo(i)) {
+              Satisfied()
+            } else {
               Satisfied(UpdateDomain(supportVar, Domain(i)))
+            }
           case SupportByActionInsertion(aps) =>
             // ignore, even if it is satisfied it does not mean we have no other options
             Undefined()
