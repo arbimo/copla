@@ -51,7 +51,7 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
           } else if (dom.contains(id)) {
             Undefined(UpdateDomain(decisionVar, dom - id))
           } else {
-            assert3(isUndefined)
+            check3(isUndefined)
             Undefined()
           }
         case DomainReduced(v) =>

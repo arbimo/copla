@@ -2,6 +2,7 @@ package copla.constraints.meta.search
 
 import copla.constraints.meta._
 import copla.constraints.meta.util.Assertion._
+import copla.constraints.meta.updates._
 
 sealed trait SearchResult {
   def isSolution: Boolean
@@ -32,7 +33,7 @@ object BinarySearch extends slogging.StrictLogging {
     implicit val csp = _csp
 
     csp.propagate() match {
-      case Consistent      => // continue
+      case Consistent(_)  => // continue
       case x: Inconsistent => return NoSolution
       case x: FatalError   => return Crash(x)
     }
@@ -68,7 +69,7 @@ object BinarySearch extends slogging.StrictLogging {
           res = Some(Solution(sol))
         case NoSolution =>
         case NoSolutionBelowDepth(d) =>
-          return Crash(FatalError("NoSolutionBelowDepth is not supported in binary search."))
+          return Crash(fatal("NoSolutionBelowDepth is not supported in binary search."))
         case x: Crash =>
           return x
       }

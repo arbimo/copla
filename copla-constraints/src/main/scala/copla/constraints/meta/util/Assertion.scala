@@ -2,6 +2,8 @@ package copla.constraints.meta.util
 
 import java.lang.management.ManagementFactory
 
+import slogging.StrictLogging
+
 import scala.annotation.elidable
 import scala.annotation.elidable._
 
@@ -18,7 +20,7 @@ import scala.annotation.elidable._
   *
   * Assertion can be remove at compile time with "-Xelide-below" parameter to scalac.
   */
-object Assertion {
+object Assertion extends StrictLogging {
 
   /** By default, debug level is set to 3 if java assertions are enabled (with VM option "-ea") and 1 otherwise */
   var DEBUG_LEVEL: Int =
@@ -81,6 +83,13 @@ object Assertion {
   final def assert4(assertion: => Boolean) {
     if (DEBUG_LEVEL >= 4 && !assertion)
       throw new java.lang.AssertionError("assertion failed")
+  }
+
+  @elidable(FINER)
+  @inline
+  final def check3(assertion: => Boolean)(implicit line: sourcecode.Line, file: sourcecode.File) {
+    if (DEBUG_LEVEL >= 3 && !assertion)
+      logger.warn(s"Check failed: ($file:$line)")
   }
 
 }

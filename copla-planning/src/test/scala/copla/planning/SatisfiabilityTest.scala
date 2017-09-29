@@ -14,10 +14,8 @@ class SatisfiabilityTest extends FunSuite {
   LoggerConfig.factory = slogging.SLF4JLoggerFactory()
   LoggerConfig.level = LogLevel.WARN
 
-
-
   test("Single sat/unsat (for debugging)") {
-    testSat(16)
+    testSat(17)
   }
 
   for (i <- Instances.satisfiables.indices) {

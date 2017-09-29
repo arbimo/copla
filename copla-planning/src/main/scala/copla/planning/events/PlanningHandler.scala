@@ -1,6 +1,7 @@
 package copla.planning.events
 
-import copla.constraints.meta.{CSP, CSPUpdateResult, Consistent, FatalError}
+import copla.constraints.meta.CSP
+import copla.constraints.meta.updates._
 import copla.constraints.meta.constraints.ExtensionConstraint
 import copla.constraints.meta.domains.ExtensionDomain
 import copla.constraints.meta.events.{Event, InternalCSPEventHandler}
@@ -100,38 +101,36 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
     RelativeTimepoint(absoluteTimepoint, tpRef.delay)
   }
 
-  def insertChronicle(chronicle: Chronicle): CSPUpdateResult = {
-    Consistent ==> CSPUpdateResult.thenForEach[core.Statement](
-      chronicle.content, {
-        case _: core.Declaration[_] =>
-          Consistent
-        case core.BindAssertion(constant, v) =>
-          val variables = (constant.params :+ v).map(variable)
-          csp.post(
-            new ExtensionConstraint(variables,
-                                    extensionDomains.getOrElseUpdate(constant.template,
-                                                                     new ExtensionDomain(variables.size))))
-        case core.StaticEqualAssertion(left, right) =>
-          csp.post(variable(left) === variable(right))
-        case core.StaticDifferentAssertion(left, right) =>
-          csp.post(variable(left) =!= variable(right))
+  def insertChronicle(chronicle: Chronicle): Update = {
+    foreach(chronicle.content) {
+      case _: core.Declaration[_] =>
+        consistent
+      case core.BindAssertion(constant, v) =>
+        val variables = (constant.params :+ v).map(variable)
+        csp.post(
+          new ExtensionConstraint(
+            variables,
+            extensionDomains.getOrElseUpdate(constant.template, new ExtensionDomain(variables.size))))
+      case core.StaticEqualAssertion(left, right) =>
+        csp.post(variable(left) === variable(right))
+      case core.StaticDifferentAssertion(left, right) =>
+        csp.post(variable(left) =!= variable(right))
 
-        case core.StaticAssignmentAssertion(left, right) =>
-          val func = left.template
-          assert1((left.params :+ right).forall(variable(_).domain.isSingleton))
-          val values = (left.params :+ right).map(variable(_).domain.head)
-          extensionDomains.getOrElseUpdate(func, new ExtensionDomain(values.size)).addTuple(values)
-          Consistent
+      case core.StaticAssignmentAssertion(left, right) =>
+        val func = left.template
+        assert1((left.params :+ right).forall(variable(_).domain.isSingleton))
+        val values = (left.params :+ right).map(variable(_).domain.head)
+        extensionDomains.getOrElseUpdate(func, new ExtensionDomain(values.size)).addTuple(values)
+        consistent
 
-        case ass: core.TimedAssertion =>
-          val structs = CausalStruct.assertionAsPlanningStructs(ass, this)
-          structs.foldLeft(Consistent: CSPUpdateResult)((status, struct) =>
-            status ==> csp.addEvent(PlanningStructureAdded(struct)))
+      case ass: core.TimedAssertion =>
+        val structs = CausalStruct.assertionAsPlanningStructs(ass, this)
+        foreach(structs)(s => csp.addEvent(PlanningStructureAdded(s)))
 
-        case core.TBefore(from, to) =>
-          csp.post(tp(from) <= tp(to))
-      }
-    )
+      case core.TBefore(from, to) =>
+        csp.post(tp(from) <= tp(to))
+    }
+
   }
   //    for(c <- chronicle.bindingConstraints.asScala)  c match {
   //      case c: VarInequalityConstraint =>
@@ -171,28 +170,29 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
   //    }
   //  }
 
-  override def handleEvent(event: Event): CSPUpdateResult = {
-    val res: CSPUpdateResult = event match {
+  override def handleEvent(event: Event): Update = {
+    val res: Update = event match {
       case InitPlanner =>
         csp.addEvent(ChronicleAdded(pb.chronicle))
       case ChronicleAdded(chronicle) =>
         insertChronicle(chronicle)
       case ActionInsertion(actionTemplate, support) =>
-        val instance = actionTemplate.instance(actionTemplate.name+"_"+actions.size)
+        val instance = actionTemplate.instance(actionTemplate.name + "_" + actions.size)
         actions += instance
-        insertChronicle(new Chronicle(instance.content)) =!> {
-          csp.post(csp.temporalOrigin <= tp(instance.start))
+        insertChronicle(new Chronicle(instance.content)) >>
+          csp.post(csp.temporalOrigin <= tp(instance.start)) >> {
           support match {
             case Some(supportVar) => csp.post(new SupportByAction(instance, supportVar))
-            case None             =>
+            case None             => consistent
           }
         }
-      case _: PlanningStructureAdded => Consistent
+      case _: PlanningStructureAdded => consistent
       case event: PlanningEvent =>
         throw new NotImplementedError(s"The event $event is not handle")
-      case _ => Consistent // not concerned by this event
+      case _ => consistent // not concerned by this event
     }
-    res ==> CSPUpdateResult.thenForEach[PlanningEventHandler](subhandlers, _.handleEvent(event))
+    res >>
+      foreach(subhandlers)(h => h.handleEvent(event))
   }
 
   override def clone(newCSP: CSP): InternalCSPEventHandler =

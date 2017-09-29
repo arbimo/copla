@@ -1,6 +1,6 @@
 package copla.constraints.meta.search.heuristics
 
-import copla.constraints.meta.{CSP, CSPUpdateResult}
+import copla.constraints.meta.{CSP, updates}
 import copla.constraints.meta.events.{Event, InternalCSPEventHandler}
 
 /** Heuristics implementing a Depth First Search priority: priority is given to the deepest node and ties are broken by
@@ -13,5 +13,5 @@ class DFSHeuristic(csp: CSP) extends Heuristic {
   /** Invoked when a CSP is cloned, the new CSP will append the handler resulting from this method into its own handlers */
   override def clone(newCSP: CSP): InternalCSPEventHandler = new DFSHeuristic(newCSP)
 
-  override def handleEvent(event: Event) = CSPUpdateResult.consistent
+  override def handleEvent(event: Event) = updates.consistent
 }

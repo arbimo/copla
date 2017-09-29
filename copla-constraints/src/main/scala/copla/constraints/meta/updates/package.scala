@@ -8,71 +8,74 @@ import scala.util.control.NonFatal
 import cats._
 
 import scala.annotation.tailrec
-import scala.reflect.internal.annotations
 
 package object updates {
 
-  sealed trait Update[+A] {
+  sealed trait UpdateResult[+A] {
     def ok: Boolean
-    def map[B](f: A => B): Update[B]
-    def flatMap[B](f: A => Update[B]): Update[B]
+    def map[B](f: A => B): UpdateResult[B]
+    def flatMap[B](f: A => UpdateResult[B]): UpdateResult[B]
 
-    def ==>[B](f: A => Update[B]): Update[B] = flatMap(f)
+    final def <<[T](next: => T)(implicit ev: T <:!< UpdateResult[Any]): UpdateResult[A] =
+      if(ok) { next; this }
+      else this
+    final def >>[T](next: => UpdateResult[T]): UpdateResult[T] = flatMap(_ => next)
+
   }
 
-  implicit val updateMonad = new Monad[Update] {
-    override def flatMap[A, B](fa: Update[A])(f: (A) => Update[B]): Update[B] = fa.flatMap(f)
+  implicit val updateMonad = new Monad[UpdateResult] {
+    override def flatMap[A, B](fa: UpdateResult[A])(f: (A) => UpdateResult[B]): UpdateResult[B] = fa.flatMap(f)
 
     @tailrec
-    override def tailRecM[A, B](a: A)(f: (A) => Update[Either[A, B]]): Update[B] = f(a) match {
+    override def tailRecM[A, B](a: A)(f: (A) => UpdateResult[Either[A, B]]): UpdateResult[B] = f(a) match {
       case x: Failure => x
       case Consistent(Right(b)) => Consistent(b)
       case Consistent(Left(nextA)) => tailRecM(nextA)(f)
     }
 
-    override def pure[A](x: A): Update[A] = consistent(x)
+    override def pure[A](x: A): UpdateResult[A] = consistent(x)
   }
 
   /** Update that does not return any value. */
-  type Up = Update[Status]
+  type Update = UpdateResult[NoReturn]
 
   /** Simple trait to represent Update with no return values. */
-  sealed trait Status
-  object Ok extends Status
+  sealed trait NoReturn
+  private object Empty extends NoReturn
 
-  final case class Consistent[+A](value: A) extends Update[A] {
+  final case class Consistent[+A](value: A) extends UpdateResult[A] {
     override def ok: Boolean = true
-    override def map[B](f: (A) => B): Update[B] = Consistent(f(value))
-    override def flatMap[B](f: (A) => Update[B]): Update[B] = f(value)
+    override def map[B](f: (A) => B): UpdateResult[B] = Consistent(f(value))
+    override def flatMap[B](f: (A) => UpdateResult[B]): UpdateResult[B] = f(value)
   }
 
-  sealed trait Failure extends Update[Nothing]
+  sealed trait Failure extends UpdateResult[Nothing]
 
-  final case class XInconsistent(msg: String) extends Failure {
+  final case class Inconsistent(msg: String) extends Failure {
     override def ok: Boolean = false
-    override def map[B](f: (Nothing) => B): XInconsistent = this
-    override def flatMap[B](f: (Nothing) => Update[B]): XInconsistent = this
+    override def map[B](f: (Nothing) => B): Inconsistent = this
+    override def flatMap[B](f: (Nothing) => UpdateResult[B]): Inconsistent = this
   }
-  case class XFatalError(msg: String, ex: Option[Throwable]) extends Failure {
+  case class FatalError(msg: String, ex: Option[Throwable]) extends Failure {
     override def ok: Boolean = false
-    override def map[B](f: (Nothing) => B): XFatalError = this
-    override def flatMap[B](f: (Nothing) => Update[B]): XFatalError = this
+    override def map[B](f: (Nothing) => B): FatalError = this
+    override def flatMap[B](f: (Nothing) => UpdateResult[B]): FatalError = this
   }
 
-  private val consistentOk: Consistent[Status] = Consistent(Ok)
-  def consistent: Consistent[Status] = consistentOk
+  private val consistentOk: Consistent[NoReturn] = Consistent(Empty)
+  def consistent: Consistent[NoReturn] = consistentOk
   def consistent[T](value: T) = Consistent(value)
-  def inconsistent(msg: String) = XInconsistent(msg)
-  def fatal(msg: String, ex: Throwable): XFatalError = {
+  def inconsistent(msg: String) = Inconsistent(msg)
+  def fatal(msg: String, ex: Throwable): FatalError = {
     Console.err.println(s"Error: $msg -- ${ex.getLocalizedMessage}")
-    XFatalError(msg, Option(ex))
+    FatalError(msg, Option(ex))
   }
-  def fatal(msg: String)(implicit file: sourcecode.File, line: sourcecode.Line): XFatalError = {
+  def fatal(msg: String)(implicit file: sourcecode.File, line: sourcecode.Line): FatalError = {
     Console.err.println(s"Error: $msg (${new File(file.value).getName}:${line.value})")
-    XFatalError(msg, None)
+    FatalError(msg, None)
   }
 
-  def check[T](f: => T)(implicit ev: T <:!< Update[Any]): Update[Status] = {
+  def check[T](f: => T)(implicit ev: T <:!< UpdateResult[Any]): UpdateResult[NoReturn] = {
     try {
       f
       consistent
@@ -81,7 +84,7 @@ package object updates {
     }
   }
 
-  def check[T](f: => Update[T]): Update[T] = {
+  def check[T](f: => UpdateResult[T]): UpdateResult[T] = {
     try {
       f
     } catch {
@@ -91,12 +94,11 @@ package object updates {
 
 
   import cats.implicits._
-  def foreach[A,B](xs: Iterable[A])(f: A => Update[B]): Update[Status] = {
-    var up: Update[Status] = consistent
+  def foreach[A,B](xs: Iterable[A])(f: A => UpdateResult[B]): UpdateResult[NoReturn] = {
+    var up: UpdateResult[NoReturn] = consistent
     val it = xs.iterator
     while(it.hasNext && up.ok) {
-      println("a")
-      up = up << f(it.next())
+      up = up.forEffect(f(it.next()))
     }
     up
   }

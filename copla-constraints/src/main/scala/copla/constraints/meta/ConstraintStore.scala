@@ -6,6 +6,8 @@ import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.IVar
 
 import scala.collection.mutable
+import updates._
+import cats.implicits._
 
 class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
   implicit val csp = _csp
@@ -74,22 +76,22 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
       removeWatcher(watched, constraint)
   }
 
-  def addWatcher(constraint: Constraint, watcher: Constraint): CSPUpdateResult = {
+  def addWatcher(constraint: Constraint, watcher: Constraint): Update = {
     val introductionResult = if (!watchers.contains(constraint)) {
       // constraint is not watched yet, record its variable and notify other components
       watchers.put(constraint, mutable.ArrayBuffer())
       for (v <- constraint.variables)
         watchedConstraintsForVar.getOrElseUpdate(v, mutable.ArrayBuffer()) += constraint
 
-      csp.addEvent(WatchConstraint(constraint)) ==>
-        CSPUpdateResult.thenForEach[OnWatchChange](constraint.onWatch, {
+      csp.addEvent(WatchConstraint(constraint)) >>
+        foreach(constraint.onWatch) {
           case Watch(subConstraint) =>
             addWatcher(subConstraint, constraint)
-        })
+        }
     } else {
-      CSPUpdateResult.consistent
+      consistent
     }
-    introductionResult =!> {
+    introductionResult >> check {
       watchers(constraint) += watcher
       watches.getOrElseUpdate(watcher, mutable.ArrayBuffer()) += constraint
       assert2(watchers(constraint).contains(watcher))
@@ -179,9 +181,8 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
   }
 
   /** Records the data field associated to this constraint */
-  def setDataOf[T <: ConstraintData](constraint: Constraint with WithData[T], value: T): CSPUpdateResult = {
+  def setDataOf[T <: ConstraintData](constraint: Constraint with WithData[T], value: T): Update = check {
     datas.put(constraint, value)
-    Consistent
   }
 
   /** Returns true iff a data field was previously recorded for this constraint */

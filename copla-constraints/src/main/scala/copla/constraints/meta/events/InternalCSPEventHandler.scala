@@ -1,9 +1,9 @@
 package copla.constraints.meta.events
 
-import copla.constraints.meta.{CSP, CSPUpdateResult}
+import copla.constraints.meta.{CSP, updates}
 
 trait CSPEventHandler {
-  def handleEvent(event: Event): CSPUpdateResult
+  def handleEvent(event: Event): updates.Update
 }
 
 trait InternalCSPEventHandler extends CSPEventHandler {

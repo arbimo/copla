@@ -6,7 +6,8 @@ import copla.constraints.bindings.InconsistentBindingConstraintNetwork
 import copla.constraints.meta.constraints.Inconsistency
 
 import scala.collection.mutable
-
+import copla.constraints.meta.updates._
+import cats.implicits._
 
 class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
 
@@ -45,20 +46,20 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
     NoSolution
   }
 
-  private def applyTrivialDecisions(_csp: CSP, maxDecisionsToApply: Int): CSPUpdateResult = {
+  private def applyTrivialDecisions(_csp: CSP, maxDecisionsToApply: Int): Update = {
     implicit val csp = _csp
-    csp.propagate() ==> {
+    csp.propagate() >> {
       if (maxDecisionsToApply == 0)
-        Consistent
+        consistent
       else {
         csp.decisions.pending.find(dec => dec.pending && dec.numOption <= 1) match {
-          case None => Consistent
+          case None => consistent
           case Some(dec) if dec.numOption == 0 =>
-            Inconsistent("Flaw with no resolver: " + dec)
+            inconsistent("Flaw with no resolver: " + dec)
           case Some(dec) if dec.numOption == 1 =>
             dec.options.head.enforceIn(csp)
             applyTrivialDecisions(csp, maxDecisionsToApply - 1)
-          case _ => FatalError("should be unreachable")
+          case _ => fatal("should be unreachable")
         }
       }
     }
@@ -72,8 +73,8 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
       //      println(" "*cur.depth + "X" + " "*(maxDepth-cur.depth-1)+"|")
       numExpansions += 1
 
-      applyTrivialDecisions(csp, 50) ==>
-        csp.propagate() =!> {
+      applyTrivialDecisions(csp, 50) >>
+        csp.propagate() << {
         // variables by increasing domain size
         val decisions = csp.decisions.pending
           .filter(_.pending)
@@ -90,8 +91,8 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
         def apply(csp: CSP, decision: DecisionOption): Option[CSP] = {
           decision.enforceIn(csp)
           csp.propagate() match {
-            case Consistent => Some(csp)
-            case _          => None
+            case Consistent(_) => Some(csp)
+            case _         => None // TODO handle FatalError properly
           }
         }
 

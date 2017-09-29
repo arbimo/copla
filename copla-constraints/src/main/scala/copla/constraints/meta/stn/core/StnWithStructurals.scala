@@ -1,14 +1,10 @@
 package copla.constraints.meta.stn.core
 
-import copla.constraints.meta.CSPUpdateResult
-import copla.constraints.meta.stn.constraint.{
-  AbsoluteAfterConstraint,
-  AbsoluteBeforeConstraint,
-  Contingent
-}
+import copla.constraints.meta.stn.constraint.{AbsoluteAfterConstraint, AbsoluteBeforeConstraint, Contingent}
 import copla.constraints.meta.stn.variables.Timepoint
 import copla.constraints.meta.stn.constraint._
 import copla.constraints.meta.stn.variables.Timepoint
+import copla.constraints.meta.updates
 import copla.constraints.meta.util.Assertion._
 import copla.constraints.stnu.{Controllability, InconsistentTemporalNetwork}
 import copla.constraints.stnu.{Controllability, InconsistentTemporalNetwork, STNU}
@@ -38,6 +34,8 @@ class StnWithStructurals(
     val executed: mutable.Set[Timepoint],
     val watchedVarsByIndex: mutable.Map[(Int, Int), mutable.ArrayBuffer[(Timepoint, Timepoint)]])
     extends DistanceMatrixListener {
+
+  import copla.constraints.meta.updates
 
   /** If true, the STNU will check that the network is Pseudo Controllable when invoking isConsistent */
   var shouldCheckPseudoControllability = true
@@ -192,7 +190,7 @@ class StnWithStructurals(
                      DistanceMatrix.plus(DistanceMatrix.plus(aToRef, t), refToB))
   }
 
-  def addConstraint(c: TemporalConstraint): CSPUpdateResult = {
+  def addConstraint(c: TemporalConstraint): updates.Update = {
     Try {
       c match {
         case req: MinDelay =>
@@ -212,11 +210,11 @@ class StnWithStructurals(
       }
     } match {
       case Success(_) =>
-        CSPUpdateResult.consistent
+        updates.consistent
       case Failure(_: InconsistentTemporalNetwork) =>
-        CSPUpdateResult.inconsistent(s"Temporal insconsistency from: $c")
+        updates.inconsistent(s"Temporal insconsistency from: $c")
       case Failure(unexpected) =>
-        CSPUpdateResult.fatal(unexpected)
+        updates.fatal("Error while propagating the temporal constraint network.", unexpected)
     }
   }
 

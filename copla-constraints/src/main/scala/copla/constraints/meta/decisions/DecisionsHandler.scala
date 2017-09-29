@@ -1,6 +1,7 @@
 package copla.constraints.meta.decisions
 
-import copla.constraints.meta.{CSP, CSPUpdateResult}
+import copla.constraints.meta.CSP
+import copla.constraints.meta.updates._
 import copla.constraints.meta.events.{Event, InternalCSPEventHandler}
 import copla.constraints.meta.events.{Event, NewVariableEvent}
 import copla.constraints.meta.variables.VarWithDomain
@@ -15,14 +16,13 @@ final class DecisionsHandler(_csp: CSP, base: Option[DecisionsHandler] = None)
     case None       => mutable.ArrayBuffer()
   }
 
-  override def handleEvent(event: Event): CSPUpdateResult = {
+  override def handleEvent(event: Event): Update = {
     event match {
       case NewVariableEvent(v: VarWithDomain) if v.isDecisionVar =>
-        add(new VarBinaryDecision(v))
-        CSPUpdateResult.consistent
+        add(VarBinaryDecision(v))
       case _ =>
-        CSPUpdateResult.consistent
     }
+    consistent
   }
 
   def add(decision: Decision) {

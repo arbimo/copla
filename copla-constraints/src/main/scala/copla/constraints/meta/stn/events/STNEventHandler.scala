@@ -1,6 +1,6 @@
 package copla.constraints.meta.stn.events
 
-import copla.constraints.meta.{CSP, CSPUpdateResult}
+import copla.constraints.meta.{CSP, updates}
 import copla.constraints.meta.constraints.Constraint
 import copla.constraints.meta.events._
 import copla.constraints.meta.stn.constraint.TemporalConstraint
@@ -17,7 +17,7 @@ class STNEventHandler(implicit val csp: CSP)
 
   def stn = csp.stn
 
-  override def handleEvent(event: Event): CSPUpdateResult = {
+  override def handleEvent(event: Event): updates.Update = {
     Try {
       event match {
         case NewVariableEvent(tp: Timepoint) =>
@@ -54,9 +54,9 @@ class STNEventHandler(implicit val csp: CSP)
       watchesSanityChecks()
     } match {
       case Failure(e: InconsistentTemporalNetwork) =>
-        CSPUpdateResult.inconsistent("Inconsistent temporal network")
-      case Failure(e) => CSPUpdateResult.fatal(e)
-      case Success(_) => CSPUpdateResult.consistent
+        updates.inconsistent("Inconsistent temporal network")
+      case Failure(e) => updates.fatal("Error in STN:", e)
+      case Success(_) => updates.consistent
     }
   }
 

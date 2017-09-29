@@ -7,7 +7,7 @@ import scala.annotation.tailrec
 
 class UpdateTest extends FunSuite {
 
-  def div(num: Int, denum: Int): Update[Int] = {
+  def div(num: Int, denum: Int): UpdateResult[Int] = {
     check {
       denum match {
         case 0 => fatal("division by zero")
@@ -16,7 +16,7 @@ class UpdateTest extends FunSuite {
     }
   }
 
-  def effect(str: String): Update[Status] = {
+  def effect(str: String): UpdateResult[NoReturn] = {
     check { println(str) }
   }
 

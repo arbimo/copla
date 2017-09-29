@@ -1,6 +1,5 @@
 package copla.constraints.meta
 
-import copla.constraints.meta.CSPUpdateResult.Computation
 import copla.constraints.meta.constraints._
 import copla.constraints.meta.decisions.DecisionsHandler
 import copla.constraints.meta.domains.{BooleanDomain, Domain, IntervalDomain}
@@ -21,74 +20,8 @@ import scala.collection.mutable
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
-sealed trait CSPUpdateResult {
-  def ok: Boolean
-  def flatMap(res: => CSPUpdateResult): CSPUpdateResult
-  def flatMapUnsafe(res: => Unit): CSPUpdateResult = flatMap({ res; Consistent })
-
-  def ==>(res: => CSPUpdateResult) = flatMap(res)
-  def =!>(res: => Unit)            = flatMapUnsafe(res)
-
-  def ==>[T](computation: Computation[T]) = this.compute(computation.x, computation.processor)
-
-  def compute[T](x: Iterable[T], processor: T => CSPUpdateResult): CSPUpdateResult =
-    x.headOption match {
-      case None       => this
-      case Some(head) => this.flatMap(processor(head)).compute(x.tail, processor)
-    }
-}
-
-object CSPUpdateResult {
-  def consistent: CSPUpdateResult         = Consistent
-  def fatal(msg: String): CSPUpdateResult = FatalError(msg)
-  def fatal(throwable: Throwable): CSPUpdateResult = {
-    throwable.printStackTrace()
-    FatalError(throwable.getLocalizedMessage)
-  }
-  def inconsistent(msg: String): CSPUpdateResult = Inconsistent(msg)
-
-  class Computation[T](val x: Iterable[T], val processor: T => CSPUpdateResult)
-
-  def thenForEach[T](x: Iterable[T], processor: T => CSPUpdateResult) =
-    new Computation[T](x, processor)
-
-  implicit class ForEachTry[T](xs: Iterable[T]) {
-    def forEachTry(processor: T => CSPUpdateResult) = new Computation[T](xs, processor)
-  }
-  implicit def computation2Result[T](c: Computation[T]): CSPUpdateResult =
-    consistent ==> c
-
-  def attemptUnit(comp: => Unit): CSPUpdateResult = attempt { comp; Consistent }
-  def attempt(comp: => CSPUpdateResult): CSPUpdateResult = {
-    Try {
-      comp
-    } match {
-      case Success(x)           => x
-      case Failure(NonFatal(e)) => FatalError("Failed attempt", Some(e))
-    }
-  }
-}
-import CSPUpdateResult._
-
-object Consistent extends CSPUpdateResult {
-  def ok                                                         = true
-  override def flatMap(res: => CSPUpdateResult): CSPUpdateResult = res
-}
-
-case class Inconsistent(msg: String) extends CSPUpdateResult {
-  def ok                                                         = false
-  override def flatMap(res: => CSPUpdateResult): CSPUpdateResult = this
-}
-case class FatalError(msg: String, ex: Option[Throwable] = None)
-    extends CSPUpdateResult
-    with slogging.StrictLogging {
-  ex match {
-    case Some(cause) => logger.error(msg, cause)
-    case None        => logger.error(msg)
-  }
-  def ok                                                         = false
-  override def flatMap(res: => CSPUpdateResult): CSPUpdateResult = this
-}
+import updates._
+import cats.implicits._
 
 class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     extends Ordered[CSP]
@@ -201,7 +134,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     post(variable === value)
   }
 
-  def updateDomain(variable: IntVariable, newDomain: Domain): CSPUpdateResult = {
+  def updateDomain(variable: IntVariable, newDomain: Domain): Update = {
     logger.debug(s"  dom-update: $variable <- $newDomain")
     if (newDomain.isEmpty) {
       fatal("empty domain update")
@@ -218,18 +151,19 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     }
   }
 
-  def propagate(): CSPUpdateResult = {
-    var result = consistent
-    while (result == consistent && events.nonEmpty) {
+  def propagate(): Update = {
+    var result: Update = consistent
+
+    while (result.ok && events.nonEmpty) {
       val e = events.dequeue()
-      result = result ==> handleEvent(e)
+      result = handleEvent(e)
     }
-    result ==>
+    result >>
       sanityCheck()
   }
 
-  def sanityCheck(): CSPUpdateResult = {
-    Try {
+  def sanityCheck(): Update = {
+    check {
       assert1(events.isEmpty, "Can't sanity check: CSP has pending events")
       assert3(
         constraints.active.forall(c => c.satisfaction == ConstraintSatisfaction.UNDEFINED),
@@ -249,14 +183,11 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         assert3(stn.watchedVarsByIndex.values.map(_.size).sum == 0,
                 stn.watchedVarsByIndex.values.flatten.toString())
       }
-    } match {
-      case Success(_) => consistent
-      case Failure(e) => fatal(e)
     }
   }
 
-  private def propagate(constraint: Constraint, event: Event): CSPUpdateResult = {
-    def applyChange(change: OnPropagationChange): CSPUpdateResult = {
+  private def propagate(constraint: Constraint, event: Event): Update = {
+    def applyChange(change: OnPropagationChange): Update = {
       change match {
         case UpdateDomain(v, d) =>
           updateDomain(v, d)
@@ -265,68 +196,63 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         case Watch(sub) =>
           constraints.addWatcher(sub, constraint)
         case UpdateData(c, update) =>
-          attemptUnit { update(c.data) }
+          check { update(c.data) }
       }
     }
     val propagationResult = constraint.propagate(event)
     logger.debug(s"Propagation of $constraint ==> $propagationResult")
     propagationResult match {
       case Satisfied(changes) =>
-        consistent.compute(changes.toList, applyChange) =!>
-          setSatisfied(constraint) =!>
+        foreach(changes)(applyChange) >>
+          setSatisfied(constraint) <<
           assert3(constraint.isSatisfied)
       case Undefined(changes) =>
-        consistent.compute(changes.toList, applyChange)
+        foreach(changes)(applyChange)
       case Inconsistency =>
         assert3(constraint.isViolated)
         inconsistent(s"Inconsistency detected during propagation of $constraint")
     }
   }
 
-  def handleEvent(event: Event): CSPUpdateResult = {
+  def handleEvent(event: Event): Update = {
     logger.debug(s"Handling event: $event")
     constraints.handleEventFirst(event)
 
-    val mainLoopResult: CSPUpdateResult = event match {
+    val mainLoopResult: Update = event match {
       case NewConstraint(c) =>
         assert1(c.active)
         for (v <- c.variables) v match {
           case v: IntVariable if !domains.contains(v) => addVariable(v)
           case _                                      =>
         }
-        c.onPost.forEachTry {
+        foreach(c.onPost) {
           case Watch(subConstraint)           => constraints.addWatcher(subConstraint, c)
           case Post(subConstraint)            => postSubConstraint(subConstraint, c)
           case DelegateToStn(tc)              => stn.addConstraint(tc)
           case InitData(constraint, data)     => constraints.setDataOf(constraint, data)
-          case UpdateData(constraint, update) => attemptUnit { update(constraint.data) }
+          case UpdateData(constraint, update) => check { update(constraint.data) }
           case AddDecision(dec)               => decisions.add(dec); consistent
-        } ==>
+        } >>
           propagate(c, event)
 
       case e: DomainChange =>
-        constraints
-          .activeWatching(e.variable)
-          .forEachTry(c => {
-            assert2(c.active)
-            propagate(c, e)
-          }) ==>
-          constraints
-            .monitoredWatching(e.variable)
-            .forEachTry(c => {
-              assert2(c.watched)
-              if (c.isSatisfied)
-                addEvent(WatchedSatisfied(c))
-              else if (c.isViolated)
-                addEvent(WatchedViolated(c))
-              consistent
-            })
+        foreach(constraints.activeWatching(e.variable)) (c => {
+          assert2(c.active)
+          propagate(c, e)
+        }) >>
+          foreach(constraints.monitoredWatching(e.variable))(c => {
+            assert2(c.watched)
+            if (c.isSatisfied)
+              addEvent(WatchedSatisfied(c))
+            else if (c.isViolated)
+              addEvent(WatchedViolated(c))
+            consistent
+          })
 
       case event: WatchedSatisfactionUpdate =>
         // propagate all active constraints monitoring it
-        constraints
-          .monitoring(event.constraint)
-          .forEachTry(c => {
+        foreach(constraints
+          .monitoring(event.constraint))(c => {
             val propagationRes =
               if (c.active) propagate(c, event)
               else consistent
@@ -342,7 +268,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           })
 
       case NewVariableEvent(v) =>
-        v.unaryConstraints.forEachTry(c => post(c))
+        foreach(v.unaryConstraints)(post)
 
       case Satisfaction(c) =>
         if (c.watched)
@@ -367,19 +293,19 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       case _                    => consistent // not an internal CSP event, ignore
     }
     val result =
-      mainLoopResult ==>
-        stnBridge.handleEvent(event) ==>
-        thenForEach[CSPEventHandler](eventHandlers, h => h.handleEvent(event)) =!>
+      mainLoopResult >>
+        stnBridge.handleEvent(event) >>
+        foreach(eventHandlers)(h => h.handleEvent(event)) <<
         constraints.handleEventLast(event)
     result
   }
 
-  def post(constraint: Constraint): CSPUpdateResult = {
+  def post(constraint: Constraint): Update = {
     logger.debug(s"  new-constraint: $constraint")
     addEvent(NewConstraint(constraint))
   }
 
-  def postSubConstraint(constraint: Constraint, parent: Constraint): CSPUpdateResult = {
+  def postSubConstraint(constraint: Constraint, parent: Constraint): Update = {
     post(constraint) // TODO, record relationship
   }
 
@@ -392,7 +318,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     varStore.getReificationVariable(constraint)
   }
 
-  def setSatisfied(constraint: Constraint): CSPUpdateResult = {
+  def setSatisfied(constraint: Constraint): Update = {
     assert1(constraint.isSatisfied)
     addEvent(Satisfaction(constraint))
   }
@@ -409,7 +335,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     v
   }
 
-  def addVariable(variable: IntVariable): CSPUpdateResult = {
+  def addVariable(variable: IntVariable): Update = {
     assert1(!hasVariable(variable))
     domains.put(variable, variable.initialDomain)
     if (variable.ref.nonEmpty)
@@ -427,7 +353,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     addEvent(NewVariableEvent(variable))
   }
 
-  def addEvent(event: Event): CSPUpdateResult = {
+  def addEvent(event: Event): Update = {
     logger.debug(s"  new-event: $event")
     events += event
     consistent
