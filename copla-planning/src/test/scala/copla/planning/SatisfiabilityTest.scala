@@ -1,6 +1,6 @@
 package copla.planning
 
-import copla.constraints.meta.search.{NoSolution, SearchResult, Solution, TreeSearch}
+import copla.constraints.meta.search.{Unsolvable, SearchResult, Solution, TreeSearch}
 import copla.constraints.meta.types.statics.TypedVariable
 import copla.constraints.meta.variables.IntVariable
 import copla.constraints.meta.{CSP, Configuration}
@@ -60,7 +60,7 @@ class SatisfiabilityTest extends FunSuite {
     val pb = Instances.unsatisfiables(i - 1)
     println(pb)
     plan(pb) match {
-      case NoSolution => // ok
+      case Unsolvable => // ok
       case res@Solution(csp) =>
         println("\n -------- REPORT --------\n")
         println(csp.report)

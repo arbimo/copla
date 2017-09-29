@@ -2,15 +2,15 @@ package copla.planning
 
 import java.io.File
 
-import copla.constraints.meta.search.{BinarySearch, SearchResult, Solution, TreeSearch}
+import copla.constraints.meta.search._
 import copla.constraints.meta.{CSP, Configuration}
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
 
 
-case class Config(file: File = new File("."))
+case class Config(file: File = new File("."), tentatives: Int = 1000, seed: Int = 0, maxDepth: Int = 200)
 
-object Planner extends App {
+object Planner extends App with slogging.StrictLogging {
 
   slogging.LoggerConfig.factory = slogging.SLF4JLoggerFactory()
   slogging.LoggerConfig.level = slogging.LogLevel.INFO
@@ -18,16 +18,44 @@ object Planner extends App {
   val parser = new scopt.OptionParser[Config]("copla") {
     head("copla")
 
+    opt[Int]('t', "tentatives")
+      .action((x, c) => c.copy(tentatives = x))
+      .text("Number of randomized searches to try")
+
+    opt[Int]('s', "seed")
+      .action((x, c) => c.copy(seed = x))
+      .text("Seed of the first tentative. Seed for subsequent tentatives are obtained by incrementing this one.")
+
+    opt[Int]('d', "max-depth")
+      .action((x, c) => c.copy(maxDepth = x))
+      .text("After at which the planner will abandon search.")
+
     arg[File]("anml-problem-file")
       .action((x, c) => c.copy(file = x))
       .text("ANML problem file for this planner to solve.")
+
+    private val logOption = "{debug, info, warn, error}"
+    opt[String]("log")
+      .action((x, c) => {
+        val lvl = x match {
+          case "debug" => slogging.LogLevel.DEBUG
+          case "info" => slogging.LogLevel.INFO
+          case "warn" => slogging.LogLevel.WARN
+          case "error" => slogging.LogLevel.ERROR
+          case _ =>
+            println(s"Error: log level should be in one of $logOption")
+            sys.exit(1)
+        }
+        slogging.LoggerConfig.level = lvl
+        c
+      })
 
     help("help").text("prints this usage text")
   }
 
   val conf: Config = parser.parse(args, Config()) match {
     case Some(x) => x
-    case None    => System.exit(1); null
+    case None    => sys.exit(1)
   }
 
   val csp = Problem.from(conf.file)
@@ -39,7 +67,21 @@ object Planner extends App {
       sys.exit(1)
   }
 
-  val planningResult = Utils.plan(csp)
+  val searcher: Searcher = new Searcher {
+    override def search(csp: CSP): SearchResult = {
+      for (i <- 0 until conf.tentatives) {
+        val subSearcher: Searcher = csp => GreedySearcher.search(csp, OptionPicker.randomized(conf.seed + i), conf.maxDepth)
+        subSearcher.search(csp) match {
+          case x@Solution(_) => return x
+          case NoSolutionFound => // keep searching
+          case x => return x
+        }
+      }
+      NoSolutionFound
+    }
+  }
+
+  val planningResult = searcher.search(csp)
 
   planningResult match {
     case Solution(solution) =>

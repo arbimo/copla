@@ -13,10 +13,10 @@ case class Solution(csp: CSP) extends SearchResult {
   override def isSolution = true
 }
 
-object NoSolution extends SearchResult {
+object Unsolvable extends SearchResult {
   override def isSolution: Boolean = false
 }
-case class NoSolutionBelowDepth(depth: Int) extends SearchResult {
+object NoSolutionFound extends SearchResult {
   override def isSolution: Boolean = false
 }
 
@@ -34,7 +34,7 @@ object BinarySearch extends slogging.StrictLogging {
 
     csp.propagate() match {
       case Consistent(_)  => // continue
-      case x: Inconsistent => return NoSolution
+      case x: Inconsistent => return Unsolvable
       case x: FatalError   => return Crash(x)
     }
 
@@ -67,13 +67,13 @@ object BinarySearch extends slogging.StrictLogging {
           // enforce better makespan for future branches
           base.post(base.temporalHorizon < sol.makespan)
           res = Some(Solution(sol))
-        case NoSolution =>
-        case NoSolutionBelowDepth(d) =>
-          return Crash(fatal("NoSolutionBelowDepth is not supported in binary search."))
+        case Unsolvable =>
+        case NoSolutionFound =>
+          return Crash(fatal("BinarySearch is exhaustive and should return Solution | Unsolvable."))
         case x: Crash =>
           return x
       }
     }
-    res.getOrElse(NoSolution)
+    res.getOrElse(Unsolvable)
   }
 }

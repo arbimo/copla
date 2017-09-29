@@ -1,0 +1,79 @@
+package copla.constraints.meta.search
+
+import copla.constraints.meta.CSP
+import copla.constraints.meta.decisions.DecisionOption
+import copla.constraints.meta.updates._
+
+import scala.annotation.tailrec
+
+trait OptionPicker {
+  def pick(options: Seq[DecisionOption]): DecisionOption
+}
+
+object OptionPicker {
+
+  def randomized(seed: Int): OptionPicker = new OptionPicker {
+    val r = new scala.util.Random(seed)
+    r.nextInt(2) // for some reason, the first number is always the same
+    override def pick(options: Seq[DecisionOption]): DecisionOption = {
+      require(options.nonEmpty)
+      val i = r.nextInt(options.size)
+      options(i)
+    }
+  }
+}
+
+trait Searcher {
+  def search(csp: CSP): SearchResult
+}
+
+object GreedySearcher extends slogging.StrictLogging {
+
+  def search(csp: CSP, picker: OptionPicker, maxDepth: Int): SearchResult = {
+    searchRec(csp.clone, picker, maxDepth, curDepth = 0)
+  }
+
+  @tailrec
+  private def searchRec(csp: CSP, picker: OptionPicker, maxDepth: Int, curDepth: Int): SearchResult = {
+    if(curDepth > maxDepth) {
+      logger.debug("Max depth reached.")
+      return NoSolutionFound
+    }
+
+    logger.debug(s"Greedy Search: depth=$curDepth")
+
+    // simply to make the implicit available
+    implicit val implCSP = csp
+
+    implCSP.propagate() match {
+      case Consistent(_)  => // continue
+      case x: Inconsistent =>
+        logger.debug("Inconsistency")
+        return NoSolutionFound
+      case x: FatalError   => return Crash(x)
+    }
+
+    // variables by increasing domain size
+    val decisions = implCSP.decisions.pending
+      .filter(_.pending)
+      .sortBy(_.numOption)
+
+    // no decision left, success!
+    if (decisions.isEmpty) {
+      println(s"Got solution of makespan: " + implCSP.makespan)
+      return Solution(implCSP)
+    }
+
+    val decision = decisions.head
+
+    logger.debug(s"Decision: $decision with options ${decision.options}")
+
+    val opt = picker.pick(decision.options)
+
+    logger.debug(s"option: $opt")
+    opt.enforceIn(implCSP)
+
+    searchRec(implCSP, picker, maxDepth, curDepth +1)
+  }
+
+}

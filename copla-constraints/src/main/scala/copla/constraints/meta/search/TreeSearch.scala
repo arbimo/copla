@@ -29,21 +29,21 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
           logger.info(
             s"Solution found in ${System.currentTimeMillis() - startTimeMs}ms with $numExpansions/$numAppliedDecisions expansions/decisions up to depth $i.")
           return Solution(solution)
-        case NoSolution =>
+        case Unsolvable =>
           logger.info("Problem has no solutions")
-          return NoSolution
-        case NoSolutionBelowDepth(_) =>
+          return Unsolvable
+        case NoSolutionFound =>
           logger.debug("No solution for this depth.")
         // continue
         case x: Crash => return x
       }
       if (i == maxDepth)
-        return NoSolutionBelowDepth(maxDepth)
+        return NoSolutionFound
     }
 
     logger.info(
       s"No solution found after $numExpansions expansions (in ${System.currentTimeMillis() - startTimeMs}ms)")
-    NoSolution
+    Unsolvable
   }
 
   private def applyTrivialDecisions(_csp: CSP, maxDecisionsToApply: Int): Update = {
@@ -110,9 +110,9 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
     }
 
     if (maxDepthReached)
-      NoSolutionBelowDepth(maxDepth)
+      NoSolutionFound
     else
-      NoSolution
+      Unsolvable
   }
 
 }
