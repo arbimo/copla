@@ -3,18 +3,13 @@ package copla.constraints.meta.decisions
 import copla.constraints.meta.CSP
 import copla.constraints.meta.variables.VarWithDomain
 
-case class VarBinaryDecision(v: VarWithDomain) extends Decision {
+case class VarBinaryDecision(variable: VarWithDomain) extends Decision {
 
-  override def pending(implicit csp: CSP): Boolean = !v.domain.isSingleton
+  override def pending(implicit csp: CSP): Boolean = !variable.domain.isSingleton
 
   override def options(implicit csp: CSP): Seq[DecisionOption] = {
-    if (v.domain.isEmpty) {
-      List()
-    } else {
-      val value = v.domain.values.head
-      List(new DecisionConstraint(v === value), new DecisionConstraint(v =!= value))
-    }
+    variable.domain.values.toSeq.map(value => DecisionConstraint(variable === value))
   }
 
-  override def numOption(implicit csp: CSP): Int = v.domain.size
+  override def numOptions(implicit csp: CSP): Int = variable.domain.size
 }

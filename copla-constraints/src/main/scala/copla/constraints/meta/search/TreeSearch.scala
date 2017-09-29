@@ -52,11 +52,11 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
       if (maxDecisionsToApply == 0)
         consistent
       else {
-        csp.decisions.pending.find(dec => dec.pending && dec.numOption <= 1) match {
+        csp.decisions.pending.find(dec => dec.pending && dec.numOptions <= 1) match {
           case None => consistent
-          case Some(dec) if dec.numOption == 0 =>
+          case Some(dec) if dec.numOptions == 0 =>
             inconsistent("Flaw with no resolver: " + dec)
-          case Some(dec) if dec.numOption == 1 =>
+          case Some(dec) if dec.numOptions == 1 =>
             dec.options.head.enforceIn(csp)
             applyTrivialDecisions(csp, maxDecisionsToApply - 1)
           case _ => fatal("should be unreachable")
@@ -78,7 +78,7 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
         // variables by increasing domain size
         val decisions = csp.decisions.pending
           .filter(_.pending)
-          .sortBy(_.numOption)
+          .sortBy(_.numOptions)
 
         // no decision left, success!
         if (decisions.isEmpty) {

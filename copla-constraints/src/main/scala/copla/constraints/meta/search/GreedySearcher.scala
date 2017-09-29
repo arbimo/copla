@@ -62,7 +62,7 @@ object GreedySearcher extends slogging.StrictLogging {
     // variables by increasing domain size
     val decisions = implCSP.decisions.pending
       .filter(_.pending)
-      .sortBy(_.numOption)
+      .sortBy(_.numOptions)
 
     // no decision left, success!
     if (decisions.isEmpty) {
@@ -73,7 +73,7 @@ object GreedySearcher extends slogging.StrictLogging {
     val decision = decisions.head
 
     logger.debug(s"Decision: $decision with options ${decision.options}")
-    if(decision.numOption == 0)
+    if(decision.numOptions == 0)
       return NoSolutionFound
     val opt = picker.pick(decision.options)
 

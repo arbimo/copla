@@ -41,7 +41,7 @@ object BinarySearch extends slogging.StrictLogging {
     // variables by increasing domain size
     val decisions = csp.decisions.pending
       .filter(_.pending)
-      .sortBy(_.numOption)
+      .sortBy(_.numOptions)
 
     // no decision left, success!
     if (decisions.isEmpty) {
@@ -55,8 +55,8 @@ object BinarySearch extends slogging.StrictLogging {
     var res: Option[SearchResult] = None
 
     logger.debug(s"Decision: $decision with options ${decision.options}")
-
-    for (opt <- decision.options) {
+    val options = Seq(decision.options.head, decision.options.head.negate)
+    for (opt <- options) {
       logger.debug(s"option: $opt")
       val cloned = base.clone
       opt.enforceIn(cloned)

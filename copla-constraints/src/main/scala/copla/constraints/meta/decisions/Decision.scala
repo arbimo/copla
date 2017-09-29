@@ -8,7 +8,7 @@ trait Decision {
   def pending(implicit csp: CSP): Boolean
 
   /** Estimate of the number of options available (typically used for variable ordering). */
-  def numOption(implicit csp: CSP): Int
+  def numOptions(implicit csp: CSP): Int
 
   /** Options to handle advance this decision.
     * Note that the decision can still be pending after applying one of the options.

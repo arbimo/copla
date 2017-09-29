@@ -1,6 +1,6 @@
 package copla.planning.causality.support
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints.ConjunctionConstraint
 import copla.constraints.meta.decisions.{Decision, DecisionConstraint, DecisionOption}
 import copla.constraints.meta.util.Assertion._
@@ -19,7 +19,7 @@ class SupportDecision(supportVar: SupportVar) extends Decision {
   }
 
   /** Estimate of the number of options available (typically used for variable ordering). */
-  override def numOption(implicit csp: CSP): Int = {
+  override def numOptions(implicit csp: CSP): Int = {
     if(pending)
       supportVar.domain.size -1
     else
@@ -41,7 +41,7 @@ class SupportDecision(supportVar: SupportVar) extends Decision {
         case (DecisionPending, _) =>
           shapeless.unexpected
       }
-    assert3(opts.size == numOption)
+    assert3(opts.size == numOptions)
     opts.toSeq
   }
 
@@ -61,13 +61,13 @@ class PendingSupportOption(action: core.ActionTemplate, supportFor: SupportVar) 
     }
   }
 
-  def reverse(csp: CSP): DecisionOption = {
+  override def negate(implicit csp: CSPView): DecisionOption = {
     // forbid this action insertion
     val constraints = supportFor.dom(csp).valuesWithIntRepresentation.toList.collect{
       case (s: SupportByActionInsertion, i) if s.a.act == action =>
         supportFor =!= i
     }
-    new DecisionConstraint(new ConjunctionConstraint(constraints))
+    DecisionConstraint(new ConjunctionConstraint(constraints))
   }
 
   override def toString : String = s"pending-support: of '$supportFor by $action"
