@@ -1,6 +1,6 @@
 package copla.constraints.meta.search
 
-import copla.constraints.meta.CSP
+import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.decisions.DecisionOption
 import copla.constraints.meta.updates._
 
@@ -29,14 +29,20 @@ trait Searcher {
 
 object GreedySearcher extends slogging.StrictLogging {
 
-  def search(csp: CSP, picker: OptionPicker, maxDepth: Int): SearchResult = {
-    searchRec(csp.clone, picker, maxDepth, curDepth = 0)
+  sealed trait Context {
+    def csp: CSPView
+    def depth: Int
+  }
+  private case class ContextImpl(csp: CSPView, depth: Int) extends Context
+
+  def search(csp: CSP, picker: OptionPicker, stopCondition: Context => Boolean): SearchResult = {
+    searchRec(csp.clone, picker, stopCondition, curDepth = 0)
   }
 
   @tailrec
-  private def searchRec(csp: CSP, picker: OptionPicker, maxDepth: Int, curDepth: Int): SearchResult = {
-    if(curDepth > maxDepth) {
-      logger.debug("Max depth reached.")
+  private def searchRec(csp: CSP, picker: OptionPicker, stopCondtion: Context => Boolean, curDepth: Int): SearchResult = {
+    if(stopCondtion(ContextImpl(csp, curDepth))) {
+      logger.debug("Stop condition triggered.")
       return NoSolutionFound
     }
 
@@ -67,13 +73,14 @@ object GreedySearcher extends slogging.StrictLogging {
     val decision = decisions.head
 
     logger.debug(s"Decision: $decision with options ${decision.options}")
-
+    if(decision.numOption == 0)
+      return NoSolutionFound
     val opt = picker.pick(decision.options)
 
     logger.debug(s"option: $opt")
     opt.enforceIn(implCSP)
 
-    searchRec(implCSP, picker, maxDepth, curDepth +1)
+    searchRec(implCSP, picker, stopCondtion, curDepth +1)
   }
 
 }

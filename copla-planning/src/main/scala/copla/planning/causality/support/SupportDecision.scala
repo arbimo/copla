@@ -30,18 +30,19 @@ class SupportDecision(supportVar: SupportVar) extends Decision {
     * Note that the decision can still be pending after applying one of the options.
     * A typical set of options for binary search is [var === val, var =!= val]. */
   override def options(implicit csp: CSP): Seq[DecisionOption] = {
-    supportVar.dom.valuesWithIntRepresentation.toList.reverse.head match {
-      case (s: SupportByActionInsertion, i) =>
-        val res = new PendingSupportOption(s.a.act, supportVar)
-        List(res, res.reverse(csp))
-      case (s: SupportByExistingChange, i) =>
-        val c = supportVar === i
-        List(new DecisionConstraint(c), new DecisionConstraint(c.reverse))
-      case (`DecisionPending`, i) =>
-        assert(supportVar.domain.isSingleton)
-        // no option when making decision, force empty domain
-        List(new DecisionConstraint(supportVar =!= i))
-    }
+    val tmp = supportVar.dom.valuesWithIntRepresentation
+    val opts = supportVar.dom.valuesWithIntRepresentation
+      .filter(tup => tup._1 != DecisionPending)
+      .map {
+        case (s: SupportByActionInsertion, _) =>
+          new PendingSupportOption(s.a.act, supportVar)
+        case (s: SupportByExistingChange, i) =>
+          DecisionConstraint(supportVar === i)
+        case (DecisionPending, _) =>
+          shapeless.unexpected
+      }
+    assert3(opts.size == numOption)
+    opts.toSeq
   }
 
   override def toString : String = s"support-decision@[${supportVar.target.ref}]"

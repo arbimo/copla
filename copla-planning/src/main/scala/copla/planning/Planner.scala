@@ -3,7 +3,7 @@ package copla.planning
 import java.io.File
 
 import copla.constraints.meta.search._
-import copla.constraints.meta.{CSP, Configuration}
+import copla.constraints.meta.{CSP, CSPView, Configuration}
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
 
@@ -69,15 +69,26 @@ object Planner extends App with slogging.StrictLogging {
 
   val searcher: Searcher = new Searcher {
     override def search(csp: CSP): SearchResult = {
+      var bestSolution: Option[CSP] = None
+      def numAction: CSPView => Int = csp =>         csp.getHandler(classOf[PlanningHandler]).actions.size
+      def stopCondition: GreedySearcher.Context => Boolean = ctx =>
+        ctx.depth > conf.maxDepth || numAction(ctx.csp) >= bestSolution.map(numAction).getOrElse(Int.MaxValue)
+
       for (i <- 0 until conf.tentatives) {
-        val subSearcher: Searcher = csp => GreedySearcher.search(csp, OptionPicker.randomized(conf.seed + i), conf.maxDepth)
+        val subSearcher: Searcher = csp => GreedySearcher.search(csp, OptionPicker.randomized(conf.seed + i), stopCondition)
         subSearcher.search(csp) match {
-          case x@Solution(_) => return x
+          case x@Solution(sol) =>
+            println(sol.getHandler(classOf[PlanningHandler]).report)
+            assert(numAction(sol) < bestSolution.map(numAction).getOrElse(Int.MaxValue))
+            bestSolution = Some(sol)
           case NoSolutionFound => // keep searching
           case x => return x
         }
       }
-      NoSolutionFound
+      bestSolution match {
+        case Some(s) => Solution(s)
+        case None => NoSolutionFound
+      }
     }
   }
 
