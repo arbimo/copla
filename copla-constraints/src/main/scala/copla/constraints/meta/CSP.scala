@@ -22,6 +22,7 @@ import scala.util.{Failure, Success, Try}
 import updates._
 import cats.implicits._
 import copla.constraints.meta.constraints.specialization.Specialization
+import copla.constraints.meta.handlers.BindingHandler
 
 class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     extends Ordered[CSP]
@@ -65,12 +66,15 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     case Left(configuration) =>
       mutable.ArrayBuffer(new TypesStore(this),
                           new DecisionsHandler(this),
-                          configuration.initialHeuristicBuilder(this))
+                          configuration.initialHeuristicBuilder(this),
+                          new BindingHandler())
   }
 
   val types: TypesStore = getHandler(classOf[TypesStore])
 
   val decisions: DecisionsHandler = getHandler(classOf[DecisionsHandler])
+
+  val bindings: BindingHandler = getHandler(classOf[BindingHandler])
 
   val heuristic: Heuristic = eventHandlers.toList.collect { case x: Heuristic => x } match {
     case h :: Nil => h
@@ -117,7 +121,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   }
 
   /** Denotes the default domain of temporal variables. */
-  private val defaultTimepointDomain = new IntervalDomain(Int.MinValue/2, Int.MaxValue/2)
+  private val defaultTimepointDomain = new IntervalDomain(Int.MinValue / 2, Int.MaxValue / 2)
 
   def dom(tp: Timepoint): IntervalDomain =
     try {
@@ -127,14 +131,15 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         defaultTimepointDomain
     }
 
-  def dom(d: TemporalDelay): IntervalDomain = try {
-    val min = stn.getMinDelay(d.from.tp, d.to.tp) + d.to.delay - d.from.delay
-    val max = stn.getMaxDelay(d.from.tp, d.to.tp) + d.to.delay - d.from.delay
-    new IntervalDomain(min, max)
-  } catch {
-    case NonFatal(e: RuntimeException) =>
-      defaultTimepointDomain
-  }
+  def dom(d: TemporalDelay): IntervalDomain =
+    try {
+      val min = stn.getMinDelay(d.from.tp, d.to.tp) + d.to.delay - d.from.delay
+      val max = stn.getMaxDelay(d.from.tp, d.to.tp) + d.to.delay - d.from.delay
+      new IntervalDomain(min, max)
+    } catch {
+      case NonFatal(e: RuntimeException) =>
+        defaultTimepointDomain
+    }
 
   def dom(v: IntVariable): Domain =
     if (domains.contains(v))
@@ -153,7 +158,8 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     } else if (variable.domain.size > newDomain.size) {
       domains(variable) = newDomain
       addEvent(DomainReduced(variable))
-    } else if (variable.domain.size < newDomain.size) {
+    } else if (variable.domain.size < newDomain.size && !bindings.isBound(variable)) {
+      // domain increase and there is no bindng constraint forbiding its growth
       domains(variable) = newDomain
       addEvent(DomainExtended(variable))
     } else {
@@ -246,7 +252,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           propagate(c, event)
 
       case e: DomainChange =>
-        foreach(constraints.activeWatching(e.variable)) (c => {
+        foreach(constraints.activeWatching(e.variable))(c => {
           assert2(c.active)
           propagate(c, e)
         }) >>
@@ -262,21 +268,22 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
 
       case event: WatchedSatisfactionUpdate =>
         // propagate all active constraints monitoring it
-        foreach(constraints
-          .monitoring(event.constraint))(c => {
-            val propagationRes =
-              if (c.active) propagate(c, event)
-              else consistent
+        foreach(
+          constraints
+            .monitoring(event.constraint))(c => {
+          val propagationRes =
+            if (c.active) propagate(c, event)
+            else consistent
 
-            // if it is watch, signal whether it is
-            if (c.watched) {
-              if (c.isSatisfied)
-                addEvent(WatchedSatisfied(c))
-              else if (c.isViolated)
-                addEvent(WatchedViolated(c))
-            }
-            propagationRes
-          })
+          // if it is watch, signal whether it is
+          if (c.watched) {
+            if (c.isSatisfied)
+              addEvent(WatchedSatisfied(c))
+            else if (c.isViolated)
+              addEvent(WatchedViolated(c))
+          }
+          propagationRes
+        })
 
       case NewVariableEvent(v) =>
         foreach(v.unaryConstraints)(post)
