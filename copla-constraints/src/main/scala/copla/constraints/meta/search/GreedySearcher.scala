@@ -72,7 +72,7 @@ object GreedySearcher extends slogging.StrictLogging {
 
     val decision = decisions.head
 
-    logger.debug(s"Decision: $decision with options ${decision.options}")
+    logger.debug(s"Decision (#opts: ${decision.numOptions}): $decision with options ${decision.options}")
     if(decision.numOptions == 0)
       return NoSolutionFound
     val opt = picker.pick(decision.options)
