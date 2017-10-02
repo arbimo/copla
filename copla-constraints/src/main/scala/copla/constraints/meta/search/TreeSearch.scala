@@ -26,10 +26,10 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
       queue = backupQueue.clone()
 
       val searchResult = search(i)
-      if(i == maxDepth)
-        searchResult
+      if (i == maxDepth)
+        return searchResult
       else
-        search(i) match {
+        searchResult match {
           case Solution(solution) =>
             logger.info(
               s"Solution found in ${System.currentTimeMillis() - startTimeMs}ms with $numExpansions/$numAppliedDecisions expansions/decisions up to depth $i.")
@@ -76,39 +76,43 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
       //      println(" "*cur.depth + "X" + " "*(maxDepth-cur.depth-1)+"|")
       numExpansions += 1
 
-      applyTrivialDecisions(csp, 50) >>
-        csp.propagate() << {
-        // variables by increasing domain size
-        val decisions = csp.decisions.pending
-          .filter(_.pending)
-          .sortBy(_.numOptions)
+      val propagationResult =
+        applyTrivialDecisions(csp, 50) >>
+          csp.propagate()
 
-        // no decision left, success!
-        if (decisions.isEmpty) {
-          println(s"Got solution of makespan: " + csp.makespan)
-          return Solution(csp)
-        }
+      propagationResult match {
+        case er: FatalError =>
+          return Crash(er)
+        case _: Inconsistent => // pass
+        case Consistent(_) =>
+          // variables by increasing domain size
+          val decisions = csp.decisions.pending
+            .filter(_.pending)
+            .sortBy(_.numOptions)
 
-        val decision = decisions.head
-
-        def apply(csp: CSP, decision: DecisionOption): Option[CSP] = {
-          decision.enforceIn(csp)
-          csp.propagate() match {
-            case Consistent(_) => Some(csp)
-            case _         => None // TODO handle FatalError properly
+          // no decision left, success!
+          if (decisions.isEmpty) {
+            println(s"Got solution of makespan: " + csp.makespan)
+            return Solution(csp)
           }
-        }
 
-        val children = decision.options.flatMap(opt => apply(csp.clone, opt))
-        numAppliedDecisions += children.size
-        for (x <- children)
-          if (x.depth <= maxDepth)
-            queue.enqueue(x)
-          else
-            maxDepthReached = true
-      } match {
-        case er: FatalError => return Crash(er)
-        case _ =>
+          val decision = decisions.head
+
+          def apply(csp: CSP, decision: DecisionOption): Option[CSP] = {
+            decision.enforceIn(csp)
+            csp.propagate() match {
+              case Consistent(_) => Some(csp)
+              case _             => None // TODO handle FatalError properly
+            }
+          }
+
+          val children = decision.options.flatMap(opt => apply(csp.clone, opt))
+          numAppliedDecisions += children.size
+          for (x <- children)
+            if (x.depth <= maxDepth)
+              queue.enqueue(x)
+            else
+              maxDepthReached = true
       }
     }
 
