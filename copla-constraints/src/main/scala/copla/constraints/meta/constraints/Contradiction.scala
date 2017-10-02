@@ -16,3 +16,8 @@ class Contradiction extends Constraint {
   /** Returns the invert of this constraint (e.g. === for an =!= constraint) */
   override def reverse: Constraint = new Tautology
 }
+
+object Contradiction {
+  private val instance = new Contradiction
+  def apply(): Contradiction = instance
+}
