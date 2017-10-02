@@ -19,9 +19,9 @@ import slogging.{LazyLogging, StrictLogging}
 import scala.collection.mutable
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
-
 import updates._
 import cats.implicits._
+import copla.constraints.meta.constraints.specialization.Specialization
 
 class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     extends Ordered[CSP]
@@ -116,14 +116,26 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     }
   }
 
-  def dom(tp: Timepoint): IntervalDomain =
-    new IntervalDomain(stn.getEarliestTime(tp), stn.getLatestTime(tp))
+  /** Denotes the default domain of temporal variables. */
+  private val defaultTimepointDomain = new IntervalDomain(Int.MinValue/2, Int.MaxValue/2)
 
-  def dom(d: TemporalDelay): IntervalDomain = {
+  def dom(tp: Timepoint): IntervalDomain =
+    try {
+      new IntervalDomain(stn.getEarliestTime(tp), stn.getLatestTime(tp))
+    } catch {
+      case NonFatal(e: RuntimeException) =>
+        defaultTimepointDomain
+    }
+
+  def dom(d: TemporalDelay): IntervalDomain = try {
     val min = stn.getMinDelay(d.from.tp, d.to.tp) + d.to.delay - d.from.delay
     val max = stn.getMaxDelay(d.from.tp, d.to.tp) + d.to.delay - d.from.delay
     new IntervalDomain(min, max)
+  } catch {
+    case NonFatal(e: RuntimeException) =>
+      defaultTimepointDomain
   }
+
   def dom(v: IntVariable): Domain =
     if (domains.contains(v))
       domains(v)
@@ -246,7 +258,8 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
               addEvent(WatchedSatisfied(c))
             else if (c.isViolated)
               addEvent(WatchedViolated(c))
-            consistent
+            else
+              consistent
           })
 
       case event: WatchedSatisfactionUpdate =>
@@ -301,8 +314,8 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   }
 
   def post(constraint: Constraint): Update = {
-    logger.debug(s"  new-constraint: $constraint")
-    addEvent(NewConstraint(constraint))
+    val s = Specialization(constraint)
+    addEvent(NewConstraint(s))
   }
 
   def postSubConstraint(constraint: Constraint, parent: Constraint): Update = {
@@ -347,7 +360,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   /** Records an event notifying of the variable addition + some sanity checks */
   def variableAdded(variable: IVar) {
     variable match {
-      case v: IntVariable => assert(domains.contains(v), "Variable has no domain")
+      case v: IntVariable => assert2(domains.contains(v), "Variable has no domain")
       case _              =>
     }
     addEvent(NewVariableEvent(variable))

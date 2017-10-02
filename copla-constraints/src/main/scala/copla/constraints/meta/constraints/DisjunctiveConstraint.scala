@@ -65,7 +65,7 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
             assert3(isUndefined)
             Undefined()
           }
-        case NewConstraint(c) => // ignore
+        case NewConstraint(c) =>
           assert3(c == this)
           decisionVar.domain.values.find(i => disjuncts(i).isSatisfied) match {
             case Some(i) =>
