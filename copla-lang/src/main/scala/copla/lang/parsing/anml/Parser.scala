@@ -454,6 +454,13 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
       new TimepointDeclaration(SimpleTPRef(new Id(emptyAct.scope, "end").toTPId))
   }
 
+  /** FIXME: this interprets a "constant" as a local variable. This is is compatible with FAPE but not with official ANML. */
+  val variableDeclaration: Parser[LocalVarDeclaration] = {
+    (constantKW ~/ declaredType ~/ freeIdent ~/ ";").map { case (typ, id) =>
+        new LocalVarDeclaration(new LocalVar(new Id(ctx.scope, id), typ))
+    }
+  }
+
   val parser: Parser[ActionTemplate] =
     (Pass ~ actionKW.sideEffect(x => {
       // set context to the current model in order to access previous declarations
@@ -471,7 +478,9 @@ class AnmlActionParser(superParser: AnmlModuleParser) extends AnmlParser(superPa
       "{" ~/
       (temporalConstraint |
         temporallyQualifiedAssertion |
-        staticAssertion.map(Seq(_)))
+        staticAssertion.map(Seq(_)) |
+        variableDeclaration.map(Seq(_))
+        )
         .sideEffect(x => updateContext(currentAction ++ x)) // add assertions to the current action
         .rep ~
       "}" ~/
