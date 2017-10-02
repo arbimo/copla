@@ -2,7 +2,6 @@ package copla.lang
 
 import java.io.File
 
-import copla.lang.analysis.AbstractionHierarchy
 import copla.lang.model.format.Formatter
 import copla.lang.model.{core, full}
 
@@ -31,7 +30,7 @@ object ParserApp extends App {
       .text("Displays an a hierarchy of the fluents in the domain, corresponding to Knoblock's abstraction hierarchies.")
       .action((_, c) => c.copy(mode = AbstractionHierarchyMode))
       .children(
-        checkConfig(c => if(c.full) failure("fluent hierarchy cannot by checked on full model.") else success)
+        checkConfig(c => if(c.mode == AbstractionHierarchyMode && c.full) failure("fluent hierarchy cannot by checked on full model.") else success)
       )
   }
 
