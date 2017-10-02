@@ -280,7 +280,7 @@ package object core {
     lazy val args: Seq[Arg] = content.collect { case ArgDeclaration(a) => a }
 
     override def toString: String =
-      s"action $name(${args.map(a => s"${a.typ} ${a.id}").mkString(", ")})"
+      s"action $name(${args.map(a => s"${a.typ} ${a.id.name}").mkString(", ")})"
 
     /** Builds a new action instance with the given name*/
     def instance(instanceName: String): Action = {
