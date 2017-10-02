@@ -1,5 +1,6 @@
 package copla.constraints.meta.constraints
 
+import copla.constraints.meta.constraints.specialization.Specialization
 import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.events.Event
 import copla.constraints.meta.variables.IVar
@@ -45,7 +46,7 @@ trait Constraint {
       new ConjunctionConstraint(List(c1, c2))
   }
 
-  def ||(constraint: Constraint) = (this, constraint) match {
+  def ||(constraint: Constraint): DisjunctiveConstraint = (this, constraint) match {
     case (c1: DisjunctiveConstraint, c2: DisjunctiveConstraint) =>
       new DisjunctiveConstraint(c1.disjuncts ++ c2.disjuncts)
     case (c1: DisjunctiveConstraint, c2) =>
@@ -54,6 +55,26 @@ trait Constraint {
       new DisjunctiveConstraint(c1 :: c2.disjuncts.toList)
     case (c1, c2) =>
       new DisjunctiveConstraint(List(c1, c2))
+  }
+
+  protected def equivalent(c: Constraint): Boolean = super.equals(c)
+  protected def hash: Int = super.hashCode()
+
+  /** A specialization aware equality constraint.
+    * Equality for general constraints can be overrided with the `equivalent` method. */
+  override final def equals(obj: scala.Any): Boolean =
+    (this, obj) match {
+      case (x: Specialization, y: Specialization) => x.general == y.general
+      case (x: Specialization, y) => x.general == y
+      case (x, y: Specialization) => x == y.general
+      case (_, y: Constraint) => equivalent(y)
+      case _ => false
+    }
+
+  /** Specialization aware hashCode. Default value can be overrided with the `hash` method. */
+  override final def hashCode(): Int = this match {
+    case x: Specialization => x.general.hashCode()
+    case _ => hash
   }
 }
 
