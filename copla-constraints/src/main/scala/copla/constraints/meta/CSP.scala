@@ -151,13 +151,11 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     if (newDomain.isEmpty) {
       fatal("empty domain update")
     } else if (variable.domain.size > newDomain.size) {
-      events += DomainReduced(variable)
       domains(variable) = newDomain
-      consistent
+      addEvent(DomainReduced(variable))
     } else if (variable.domain.size < newDomain.size) {
-      events += DomainExtended(variable)
       domains(variable) = newDomain
-      consistent
+      addEvent(DomainExtended(variable))
     } else {
       consistent
     }
@@ -206,7 +204,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         case Post(subConstraint) =>
           postSubConstraint(subConstraint, constraint)
         case Watch(sub) =>
-          constraints.addWatcher(sub, constraint)
+          addWatcher(sub, constraint)
         case UpdateData(c, update) =>
           check { update(c.data) }
       }
@@ -238,7 +236,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           case _                                      =>
         }
         foreach(c.onPost) {
-          case Watch(subConstraint)           => constraints.addWatcher(subConstraint, c)
+          case Watch(subConstraint)           => addWatcher(subConstraint, c)
           case Post(subConstraint)            => postSubConstraint(subConstraint, c)
           case DelegateToStn(tc)              => stn.addConstraint(tc)
           case InitData(constraint, data)     => constraints.setDataOf(constraint, data)
@@ -320,6 +318,11 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
 
   def postSubConstraint(constraint: Constraint, parent: Constraint): Update = {
     post(constraint) // TODO, record relationship
+  }
+
+  def addWatcher(watched: Constraint, watching: Constraint): Update = {
+    val specialized = Specialization(watched)
+    constraints.addWatcher(specialized, watching)
   }
 
   def reified(constraint: Constraint): ReificationVariable = {
