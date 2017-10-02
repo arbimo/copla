@@ -43,7 +43,7 @@ object GreedySearcher extends slogging.StrictLogging {
   private def searchRec(csp: CSP, picker: OptionPicker, stopCondtion: Context => Boolean, curDepth: Int): SearchResult = {
     if(stopCondtion(ContextImpl(csp, curDepth))) {
       logger.debug("Stop condition triggered.")
-      return NoSolutionFound
+      return NoSolutionFound(Some(csp))
     }
 
     logger.debug(s"Greedy Search: depth=$curDepth")
@@ -55,7 +55,7 @@ object GreedySearcher extends slogging.StrictLogging {
       case Consistent(_)  => // continue
       case x: Inconsistent =>
         logger.debug("Inconsistency")
-        return NoSolutionFound
+        return NoSolutionFound(Some(implCSP))
       case x: FatalError   => return Crash(x)
     }
 
@@ -74,7 +74,7 @@ object GreedySearcher extends slogging.StrictLogging {
 
     logger.debug(s"Decision (#opts: ${decision.numOptions}): $decision with options ${decision.options}")
     if(decision.numOptions == 0)
-      return NoSolutionFound
+      return NoSolutionFound(Some(implCSP))
     val opt = picker.pick(decision.options)
 
     logger.debug(s"option: $opt")

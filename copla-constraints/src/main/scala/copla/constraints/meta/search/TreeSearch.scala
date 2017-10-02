@@ -24,21 +24,24 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
     for (i <- 0 to maxDepth) {
       logger.debug(s"DFS up to depth $i")
       queue = backupQueue.clone()
-      search(i) match {
-        case Solution(solution) =>
-          logger.info(
-            s"Solution found in ${System.currentTimeMillis() - startTimeMs}ms with $numExpansions/$numAppliedDecisions expansions/decisions up to depth $i.")
-          return Solution(solution)
-        case Unsolvable =>
-          logger.info("Problem has no solutions")
-          return Unsolvable
-        case NoSolutionFound =>
-          logger.debug("No solution for this depth.")
-        // continue
-        case x: Crash => return x
-      }
-      if (i == maxDepth)
-        return NoSolutionFound
+
+      val searchResult = search(i)
+      if(i == maxDepth)
+        searchResult
+      else
+        search(i) match {
+          case Solution(solution) =>
+            logger.info(
+              s"Solution found in ${System.currentTimeMillis() - startTimeMs}ms with $numExpansions/$numAppliedDecisions expansions/decisions up to depth $i.")
+            return Solution(solution)
+          case Unsolvable =>
+            logger.info("Problem has no solutions")
+            return Unsolvable
+          case NoSolutionFound(_) =>
+            logger.debug("No solution for this depth.")
+          // continue
+          case x: Crash => return x
+        }
     }
 
     logger.info(
@@ -67,8 +70,8 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
 
   def search(maxDepth: Int = Integer.MAX_VALUE): SearchResult = {
     var maxDepthReached = false
-    while (queue.nonEmpty) {
 
+    while (queue.nonEmpty) {
       implicit val csp = queue.dequeue()
       //      println(" "*cur.depth + "X" + " "*(maxDepth-cur.depth-1)+"|")
       numExpansions += 1
@@ -110,7 +113,7 @@ class TreeSearch(nodes: Seq[CSP]) extends slogging.StrictLogging {
     }
 
     if (maxDepthReached)
-      NoSolutionFound
+      NoSolutionFound(None)
     else
       Unsolvable
   }

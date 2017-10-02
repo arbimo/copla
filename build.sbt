@@ -66,5 +66,14 @@ lazy val coplaPlanning = project.in(file("copla-planning"))
     "org.scalatest" %% "scalatest" % "3.0.1" % "test",
     "com.github.scopt" %% "scopt" % "3.7.0",
     "biz.enef" %% "slogging" % "0.5.3",
-    "org.slf4j" % "slf4j-simple" % "1.7.12" % "optional"
+    "org.slf4j" % "slf4j-simple" % "1.7.12"
+  ))
+
+lazy val coplaExp = project.in(file("copla-exp"))
+  .dependsOn(coplaPlanning)
+  .settings(name := "copla-exp")
+  .settings(commonSettings: _*)
+  .settings(commonJVMSettings: _*)
+  .settings(libraryDependencies ++= Seq(
+    "org.slf4j" % "slf4j-simple" % "1.7.12"
   ))

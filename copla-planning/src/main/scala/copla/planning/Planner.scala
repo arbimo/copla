@@ -84,13 +84,13 @@ object Planner extends App with slogging.StrictLogging {
             println(sol.getHandler(classOf[PlanningHandler]).report)
             assert(numAction(sol) < bestSolution.map(numAction).getOrElse(Int.MaxValue))
             bestSolution = Some(sol)
-          case NoSolutionFound => // keep searching
+          case NoSolutionFound(_) => // keep searching
           case x => return x
         }
       }
       bestSolution match {
         case Some(s) => Solution(s)
-        case None => NoSolutionFound
+        case None => NoSolutionFound(None)
       }
     }
   }

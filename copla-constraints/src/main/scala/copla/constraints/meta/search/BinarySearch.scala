@@ -16,7 +16,7 @@ case class Solution(csp: CSP) extends SearchResult {
 object Unsolvable extends SearchResult {
   override def isSolution: Boolean = false
 }
-object NoSolutionFound extends SearchResult {
+case class NoSolutionFound(lastCSP: Option[CSP]) extends SearchResult {
   override def isSolution: Boolean = false
 }
 
@@ -68,7 +68,7 @@ object BinarySearch extends slogging.StrictLogging {
           base.post(base.temporalHorizon < sol.makespan)
           res = Some(Solution(sol))
         case Unsolvable =>
-        case NoSolutionFound =>
+        case NoSolutionFound(_) =>
           return Crash(fatal("BinarySearch is exhaustive and should return Solution | Unsolvable."))
         case x: Crash =>
           return x
