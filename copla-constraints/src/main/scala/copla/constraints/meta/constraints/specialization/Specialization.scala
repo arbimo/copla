@@ -6,6 +6,8 @@ import copla.constraints.meta.events.Event
 import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.IVar
 
+import scala.collection.mutable
+
 /**
   * Denotes a CSP specific view of a constraint.
   * The constraint will pretend to be the original constraint through its hashCode and equals methods) but
@@ -57,22 +59,44 @@ object Specialization {
         contradiction(c)
 
       case c: DisjunctiveConstraint =>
-        val disjuncts = c.disjuncts.map(sc => specialize(sc)).filterNot(_.isViolated)
-        if(disjuncts.exists(_.isSatisfied))
-          tautology(c)
-        else if(disjuncts.isEmpty)
-          contradiction(c)
-        else
-          spec(new DisjunctiveConstraint(disjuncts), c)
+        val newDisjuncts: mutable.ArrayBuffer[Constraint] = mutable.ArrayBuffer[Constraint]()
+        for(disjunct <- c.disjuncts) {
+          val spec = specialize(disjunct)
+          spec.satisfaction match {
+            case ConstraintSatisfaction.SATISFIED =>
+              // one disjunct is satisfied, the constraint is satisfied
+              return tautology(c)
+            case ConstraintSatisfaction.VIOLATED =>
+              // violated, remove from disjunct
+            case ConstraintSatisfaction.UNDEFINED =>
+              newDisjuncts += spec
+          }
+        }
+        newDisjuncts match {
+          case Seq() => contradiction(c)
+          case Seq(single) => spec(single, c)
+          case _ => spec(new DisjunctiveConstraint(newDisjuncts), c)
+        }
 
       case c: ConjunctionConstraint =>
-        val conjuncts = c.constraints.map(specialize).filterNot(_.isSatisfied)
-        if(conjuncts.isEmpty)
-          tautology(c)
-        else if(conjuncts.exists(_.isViolated))
-          contradiction(c)
-        else
-          spec(new ConjunctionConstraint(conjuncts), c)
+        val subConstraints: mutable.ArrayBuffer[Constraint] = mutable.ArrayBuffer[Constraint]()
+        for(subConstraint <- c.constraints) {
+          val spec = specialize(subConstraint)
+          spec.satisfaction match {
+            case ConstraintSatisfaction.SATISFIED =>
+              // ignore in specialized version
+            case ConstraintSatisfaction.VIOLATED =>
+              // violated, entire conjunction is violated
+              return contradiction(c)
+            case ConstraintSatisfaction.UNDEFINED =>
+              subConstraints += spec
+          }
+        }
+        subConstraints match {
+          case Seq() => tautology(c)
+          case Seq(single) => spec(single, c)
+          case _ => spec(new ConjunctionConstraint(subConstraints), c)
+        }
 
       case c =>
         c
