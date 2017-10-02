@@ -62,6 +62,9 @@ object Planner extends App with slogging.StrictLogging {
     .map(Utils.csp) match {
     case copla.lang.Success(csp) =>
       csp
+    case copla.lang.ParseError(failure) =>
+      println(failure.format)
+      sys.exit(1)
     case err =>
       println(err)
       sys.exit(1)
