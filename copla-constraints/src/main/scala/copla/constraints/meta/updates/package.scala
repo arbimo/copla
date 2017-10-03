@@ -56,7 +56,7 @@ package object updates {
     override def map[B](f: (Nothing) => B): Inconsistent = this
     override def flatMap[B](f: (Nothing) => UpdateResult[B]): Inconsistent = this
   }
-  case class FatalError(msg: String, ex: Option[Throwable]) extends Failure {
+  case class FatalError private (msg: String, ex: Option[Throwable]) extends Failure {
     override def ok: Boolean = false
     override def map[B](f: (Nothing) => B): FatalError = this
     override def flatMap[B](f: (Nothing) => UpdateResult[B]): FatalError = this
@@ -68,6 +68,7 @@ package object updates {
   def inconsistent(msg: String) = Inconsistent(msg)
   def fatal(msg: String, ex: Throwable): FatalError = {
     Console.err.println(s"Error: $msg -- ${ex.getLocalizedMessage}")
+    ex.printStackTrace()
     FatalError(msg, Option(ex))
   }
   def fatal(msg: String)(implicit file: sourcecode.File, line: sourcecode.Line): FatalError = {
