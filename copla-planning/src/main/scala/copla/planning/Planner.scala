@@ -6,6 +6,7 @@ import copla.constraints.meta.search._
 import copla.constraints.meta.{CSP, CSPView, Configuration}
 import copla.planning.events.{InitPlanner, PlanningHandler}
 import copla.planning.model.Problem
+import copla.planning.search.DecisionOrderings
 
 
 case class Config(file: File = new File("."), tentatives: Int = 1000, seed: Int = 0, maxDepth: Int = 200)
@@ -13,7 +14,7 @@ case class Config(file: File = new File("."), tentatives: Int = 1000, seed: Int 
 object Planner extends App with slogging.StrictLogging {
 
   slogging.LoggerConfig.factory = slogging.SLF4JLoggerFactory()
-  slogging.LoggerConfig.level = slogging.LogLevel.INFO
+  slogging.LoggerConfig.level = slogging.LogLevel.DEBUG
 
   val parser = new scopt.OptionParser[Config]("copla") {
     head("copla")
@@ -78,7 +79,7 @@ object Planner extends App with slogging.StrictLogging {
         ctx.depth > conf.maxDepth || numAction(ctx.csp) >= bestSolution.map(numAction).getOrElse(Int.MaxValue)
 
       for (i <- 0 until conf.tentatives) {
-        val subSearcher: Searcher = csp => GreedySearcher.search(csp, OptionPicker.randomized(conf.seed + i), stopCondition)
+        val subSearcher: Searcher = csp => GreedySearcher.search(csp, DecisionOrderings.default, OptionPicker.randomized(conf.seed + i), stopCondition)
         subSearcher.search(csp) match {
           case x@Solution(sol) =>
             println(sol.getHandler(classOf[PlanningHandler]).report)

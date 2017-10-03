@@ -6,6 +6,7 @@ import copla.constraints.meta.search._
 import copla.planning.Utils
 import copla.planning.events.PlanningHandler
 import copla.planning.model.Problem
+import copla.planning.search.DecisionOrderings
 
 
 object InstrumentedPlanner extends App {
@@ -28,7 +29,7 @@ object InstrumentedPlanner extends App {
   val csp = baseCsp.clone
   csp.addHandler(new Instrumentation())
 
-  val searcher: Searcher = csp => GreedySearcher.search(csp, OptionPicker.randomized(10), ctx => ctx.depth > 100)
+  val searcher: Searcher = csp => GreedySearcher.search(csp, DecisionOrderings.default, OptionPicker.randomized(10), ctx => ctx.depth > 100)
 
   val lastCSP = searcher.search(csp) match {
     case x@Solution(sol) =>
@@ -56,7 +57,7 @@ object InstrumentedPlanner extends App {
       .mkString("\n")
   )
 
-  val numTests = 10
+  val numTests = 100
   val startTime = System.currentTimeMillis()
   for(i <- 0 to numTests)
     searcher.search(baseCsp)

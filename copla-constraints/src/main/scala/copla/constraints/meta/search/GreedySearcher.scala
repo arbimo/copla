@@ -1,7 +1,7 @@
 package copla.constraints.meta.search
 
 import copla.constraints.meta.{CSP, CSPView}
-import copla.constraints.meta.decisions.DecisionOption
+import copla.constraints.meta.decisions.{Decision, DecisionOption}
 import copla.constraints.meta.updates._
 
 import scala.annotation.tailrec
@@ -23,6 +23,13 @@ object OptionPicker {
   }
 }
 
+trait DecisionOrdering {
+
+  /** Lower means higher priority */
+  def priority(decision: Decision)(implicit csp: CSPView): Float
+
+}
+
 trait Searcher {
   def search(csp: CSP): SearchResult
 }
@@ -35,12 +42,12 @@ object GreedySearcher extends slogging.StrictLogging {
   }
   private case class ContextImpl(csp: CSPView, depth: Int) extends Context
 
-  def search(csp: CSP, picker: OptionPicker, stopCondition: Context => Boolean): SearchResult = {
-    searchRec(csp.clone, picker, stopCondition, curDepth = 0)
+  def search(csp: CSP, decOrd: DecisionOrdering, picker: OptionPicker, stopCondition: Context => Boolean): SearchResult = {
+    searchRec(csp.clone, decOrd, picker, stopCondition, curDepth = 0)
   }
 
   @tailrec
-  private def searchRec(csp: CSP, picker: OptionPicker, stopCondtion: Context => Boolean, curDepth: Int): SearchResult = {
+  private def searchRec(csp: CSP, decOrder: DecisionOrdering, picker: OptionPicker, stopCondtion: Context => Boolean, curDepth: Int): SearchResult = {
     if(stopCondtion(ContextImpl(csp, curDepth))) {
       logger.debug("Stop condition triggered.")
       return NoSolutionFound(Some(csp))
@@ -62,11 +69,11 @@ object GreedySearcher extends slogging.StrictLogging {
     // variables by increasing domain size
     val decisions = implCSP.decisions.pending
       .filter(_.pending)
-      .sortBy(_.numOptions)
+      .sortBy(decOrder.priority)
 
     // no decision left, success!
     if (decisions.isEmpty) {
-      println(s"Got solution of makespan: " + implCSP.makespan)
+      logger.info(s"Got solution of makespan: " + implCSP.makespan)
       return Solution(implCSP)
     }
 
@@ -80,7 +87,7 @@ object GreedySearcher extends slogging.StrictLogging {
     logger.debug(s"option: $opt")
     opt.enforceIn(implCSP)
 
-    searchRec(implCSP, picker, stopCondtion, curDepth +1)
+    searchRec(implCSP, decOrder, picker, stopCondtion, curDepth +1)
   }
 
 }
