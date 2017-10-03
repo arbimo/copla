@@ -5,7 +5,7 @@ import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.events.Event
 import copla.constraints.meta.variables.IVar
 
-trait Constraint {
+trait Constraint extends Ordered[Constraint] {
 
   type Satisfaction = ConstraintSatisfaction
 
@@ -57,25 +57,29 @@ trait Constraint {
       new DisjunctiveConstraint(List(c1, c2))
   }
 
-  protected def equivalent(c: Constraint): Boolean = super.equals(c)
-  protected def hash: Int = super.hashCode()
+  private lazy val id: Int = this match  {
+    case x: Specialization => x.general.id
+    case _ => Constraint.getNewId()
+  }
+
+  override final def compare(that: Constraint): Int = id - that.id
 
   /** A specialization aware equality constraint.
     * Equality for general constraints can be overrided with the `equivalent` method. */
   override final def equals(obj: scala.Any): Boolean =
-    (this, obj) match {
-      case (x: Specialization, y: Specialization) => x.general == y.general
-      case (x: Specialization, y) => x.general == y
-      case (x, y: Specialization) => x == y.general
-      case (_, y: Constraint) => equivalent(y)
+    obj match {
+      case y: Constraint => id == y.id
       case _ => false
     }
 
   /** Specialization aware hashCode. Default value can be overrided with the `hash` method. */
-  override final def hashCode(): Int = this match {
-    case x: Specialization => x.general.hashCode()
-    case _ => hash
-  }
+  override final def hashCode(): Int = id
+}
+
+object Constraint {
+  private[this] var nextId: Int = 0
+  private[constraints] def getNewId(): Int = this.synchronized { nextId += 1; nextId-1 }
+
 }
 
 /** Enum like trait to represent the status of a constraint in a given network. */
