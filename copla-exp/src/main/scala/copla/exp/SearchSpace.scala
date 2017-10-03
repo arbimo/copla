@@ -17,8 +17,8 @@ import scala.util.Random
 object SearchSpace extends App {
 
 
-  val numTentatives = 30
-  val numOrderings = 5
+  val numTentatives = 2000
+  val numOrderings = 6
 
   val results: mutable.ArrayBuffer[(String, String, Int)] = mutable.ArrayBuffer()
 
@@ -82,7 +82,8 @@ object SearchSpace extends App {
       case 1 => noChoice :: numOptions :: isNotSupport :: absLvl :: Nil
       case 2 => noChoice :: isSupport :: absLvl :: numOptions :: Nil
       case 3 => noChoice :: isNotSupport ::  numOptions :: absLvl :: Nil
-      case 4 => isSupport :: numOptions :: absLvl :: numOptions :: Nil
+      case 4 => isSupport :: noChoice :: absLvl :: numOptions :: Nil
+      case 5 => noChoice :: isNotSupport :: numOptions :: absLvl :: Nil
     }
 
     SeqFeatures(features)
