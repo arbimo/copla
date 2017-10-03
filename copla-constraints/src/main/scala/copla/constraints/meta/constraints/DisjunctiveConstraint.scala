@@ -62,7 +62,6 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
           } else if (dom.isSingleton) {
             Undefined(Post(disjuncts(dom.head)))
           } else {
-            assert3(isUndefined)
             Undefined()
           }
         case NewConstraint(c) =>
