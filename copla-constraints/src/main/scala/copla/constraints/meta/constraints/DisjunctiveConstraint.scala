@@ -2,7 +2,7 @@ package copla.constraints.meta.constraints
 
 import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints.ConstraintSatisfaction._
-import copla.constraints.meta.decisions.VarBinaryDecision
+import copla.constraints.meta.decisions.VarBindingDecision
 import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.events._
 import copla.constraints.meta.util.Assertion._
@@ -15,7 +15,7 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
     override def toString: String = s"disjunctive-dec-var[${DisjunctiveConstraint.this}]"
   }
 
-  val decision = VarBinaryDecision(decisionVar)
+  val decision = VarBindingDecision(decisionVar)
 
   override def variables(implicit csp: CSPView): Set[IVar] = Set(decisionVar)
 

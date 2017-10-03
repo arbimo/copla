@@ -19,7 +19,7 @@ final class DecisionsHandler(_csp: CSP, base: Option[DecisionsHandler] = None)
   override def handleEvent(event: Event): Update = {
     event match {
       case NewVariableEvent(v: VarWithDomain) if v.isDecisionVar =>
-        add(VarBinaryDecision(v))
+        add(VarBindingDecision(v))
       case _ =>
     }
     consistent
