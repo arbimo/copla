@@ -14,34 +14,34 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
 
   def this(_csp: CSP) = this(_csp, None)
 
-  val active: mutable.ArrayBuffer[Constraint] = toClone match {
-    case None       => mutable.ArrayBuffer[Constraint]()
+  val active: mutable.Set[Constraint] = toClone match {
+    case None       => mutable.Set[Constraint]()
     case Some(base) => base.active.clone()
   }
 
-  val satisfied: mutable.ArrayBuffer[Constraint] = toClone match {
-    case None       => mutable.ArrayBuffer[Constraint]()
+  val satisfied: mutable.Set[Constraint] = toClone match {
+    case None       => mutable.Set[Constraint]()
     case Some(base) => base.satisfied.clone()
   }
 
-  private val activeConstraintsForVar: mutable.Map[IVar, mutable.ArrayBuffer[Constraint]] =
+  private val activeConstraintsForVar: mutable.Map[IVar, mutable.Set[Constraint]] =
     toClone match {
       case None       => mutable.Map()
       case Some(base) => base.activeConstraintsForVar.map(kv => (kv._1, kv._2.clone()))
     }
 
-  private val watchedConstraintsForVar: mutable.Map[IVar, mutable.ArrayBuffer[Constraint]] =
+  private val watchedConstraintsForVar: mutable.Map[IVar, mutable.Set[Constraint]] =
     toClone match {
       case None       => mutable.Map()
       case Some(base) => base.watchedConstraintsForVar.map(kv => (kv._1, kv._2.clone()))
     }
 
-  private val watchers: mutable.Map[Constraint, mutable.ArrayBuffer[Constraint]] = toClone match {
+  private val watchers: mutable.Map[Constraint, mutable.Set[Constraint]] = toClone match {
     case None       => mutable.Map()
     case Some(base) => base.watchers.map(kv => (kv._1, kv._2.clone()))
   }
 
-  private val watches: mutable.Map[Constraint, mutable.ArrayBuffer[Constraint]] = toClone match {
+  private val watches: mutable.Map[Constraint, mutable.Set[Constraint]] = toClone match {
     case None       => mutable.Map()
     case Some(base) => base.watches.map(kv => (kv._1, kv._2.clone()))
   }
@@ -54,9 +54,11 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
 
   /** Records a new active constraint and adds its variables to the index */
   private def record(constraint: Constraint) {
-    active += constraint
-    for (v <- constraint.variables) {
-      activeConstraintsForVar.getOrElseUpdate(v, mutable.ArrayBuffer()) += constraint
+    if(!constraint.active) {
+      active += constraint
+      for (v <- constraint.variables) {
+        activeConstraintsForVar.getOrElseUpdate(v, mutable.Set()) += constraint
+      }
     }
   }
 
@@ -77,23 +79,24 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
   }
 
   def addWatcher(constraint: Constraint, watcher: Constraint): Update = {
-    val introductionResult = if (!watchers.contains(constraint)) {
-      // constraint is not watched yet, record its variable and notify other components
-      watchers.put(constraint, mutable.ArrayBuffer())
-      for (v <- constraint.variables)
-        watchedConstraintsForVar.getOrElseUpdate(v, mutable.ArrayBuffer()) += constraint
+    val introductionResult =
+      if (!watchers.contains(constraint)) {
+        // constraint is not watched yet, record its variable and notify other components
+        watchers.put(constraint, mutable.Set())
+        for (v <- constraint.variables)
+          watchedConstraintsForVar.getOrElseUpdate(v, mutable.Set()) += constraint
 
-      csp.addEvent(WatchConstraint(constraint)) >>
-        foreach(constraint.onWatch) {
-          case Watch(subConstraint) =>
-            addWatcher(subConstraint, constraint)
-        }
-    } else {
-      consistent
-    }
+        csp.addEvent(WatchConstraint(constraint)) >>
+          foreach(constraint.onWatch) {
+            case Watch(subConstraint) =>
+              addWatcher(subConstraint, constraint)
+          }
+      } else {
+        consistent
+      }
     introductionResult >> check {
       watchers(constraint) += watcher
-      watches.getOrElseUpdate(watcher, mutable.ArrayBuffer()) += constraint
+      watches.getOrElseUpdate(watcher, mutable.Set()) += constraint
       assert2(watchers(constraint).contains(watcher))
       assert2(watches(watcher).contains(constraint))
     }

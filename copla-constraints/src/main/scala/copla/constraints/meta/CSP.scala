@@ -399,11 +399,11 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       case _                   => str.append(s"$v = ${v.domain}\n")
     }
     str.append("%% ACTIVE CONSTRAINTS\n")
-    for (c <- constraints.active.sortBy(_.toString))
+    for (c <- constraints.active.toSeq.sortBy(_.toString))
       str.append(s"$c  ${c.satisfaction}\n")
 
     str.append("%% SATISFIED CONSTRAINTS\n")
-    for (c <- constraints.satisfied.sortBy(_.toString))
+    for (c <- constraints.satisfied.toSeq.sortBy(_.toString))
       str.append(s"$c  ${c.satisfaction}\n")
     str.toString
   }
