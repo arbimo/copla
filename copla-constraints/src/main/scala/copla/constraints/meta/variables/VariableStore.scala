@@ -8,7 +8,8 @@ import copla.constraints.meta.stn.variables.{RelativeTimepoint, TemporalDelay, T
 import scala.collection.mutable
 
 object VariableStore {
-  var nextID: Int = 0
+  private[this] var nextID: Int = 0
+  def nextVariableId(): Int =  this.synchronized { nextID += 1; nextID - 1 }
 }
 
 class VariableStore(csp: CSP, toClone: Option[VariableStore] = None) {
@@ -28,8 +29,6 @@ class VariableStore(csp: CSP, toClone: Option[VariableStore] = None) {
     case Some(base) => base.distanceVariables.clone()
     case None       => mutable.Map()
   }
-
-  def nextVariableId(): Int = { nextID += 1; nextID - 1 }
 
   def getBooleanVariable(ref: Any): BooleanVariable = {
     assert(!varsByRef.contains(ref))

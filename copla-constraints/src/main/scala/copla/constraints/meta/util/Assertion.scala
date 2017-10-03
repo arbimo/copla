@@ -87,9 +87,9 @@ object Assertion extends StrictLogging {
 
   @elidable(FINER)
   @inline
-  final def check3(assertion: => Boolean)(implicit line: sourcecode.Line, file: sourcecode.File) {
+  final def check3(assertion: => Boolean, message: => Any)(implicit line: sourcecode.Line, file: sourcecode.File) {
     if (DEBUG_LEVEL >= 3 && !assertion)
-      logger.warn(s"Check failed: ($file:$line)")
+      logger.warn(s"Check failed: "+message+ s" ($file:$line)")
   }
 
 }

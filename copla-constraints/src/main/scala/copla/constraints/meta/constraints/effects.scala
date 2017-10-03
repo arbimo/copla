@@ -27,6 +27,7 @@ case class UpdateData[T <: ConstraintData](constraint: Constraint with WithData[
     with OnPostChange
 
 case class AddDecision(dec: Decision) extends OnPostChange
+case class RetractDecision(dec: Decision) extends OnPropagationChange
 
 /** Represent the output of a propagation process. This includes,
   * (i) a set of updates to the CSP induced by the propagation and

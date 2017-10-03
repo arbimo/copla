@@ -181,12 +181,12 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   def sanityCheck(): Update = {
     check {
       assert1(events.isEmpty, "Can't sanity check: CSP has pending events")
-      assert3(
+      check3(
         constraints.active.forall(c => c.satisfaction == ConstraintSatisfaction.UNDEFINED),
         "Satisfaction of an active constraint is not UNDEFINED:\n " +
           constraints.active
             .collect {
-              case c if c.isUndefined => c + " : " + c.satisfaction
+              case c if !c.isUndefined => c + " : " + c.satisfaction
             }
             .mkString("\n")
       )
@@ -213,6 +213,8 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           addWatcher(sub, constraint)
         case UpdateData(c, update) =>
           check { update(c.data) }
+        case RetractDecision(decision) =>
+          check { decisions.retract(decision) }
       }
     }
     val propagationResult = constraint.propagate(event)
@@ -342,7 +344,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   }
 
   def setSatisfied(constraint: Constraint): Update = {
-    assert1(constraint.isSatisfied)
+    assert2(constraint.isSatisfied, s"Constraint $constraint is not satisfied but ${constraint.satisfaction}")
     addEvent(Satisfaction(constraint))
   }
 
@@ -384,7 +386,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
 
   def hasVariable(variable: IntVariable): Boolean = domains.contains(variable)
 
-  def nextVarId() = varStore.nextVariableId()
+  def nextVarId() = VariableStore.nextVariableId()
 
   /** Indicates which of the two CSP (this and that) should be handled first. */
   override def compare(that: CSP): Int =

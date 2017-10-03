@@ -29,6 +29,10 @@ final class DecisionsHandler(_csp: CSP, base: Option[DecisionsHandler] = None)
     pendingDecisions += decision
   }
 
+  def retract(decision: Decision): Unit = {
+    pendingDecisions -= decision
+  }
+
   def pending: Seq[Decision] = pendingDecisions
 
   /** Invoked when a CSP is cloned, the new CSP will append the handler resulting from this method into its own handlers */

@@ -36,19 +36,14 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
   override def variables(implicit csp: CSPView): Set[IVar] = Set(supportVar)
 
   override def satisfaction(implicit csp: CSPView): Satisfaction = {
-    if (supportVar.domain.isSingleton) {
-      supportVar.dom.values.head match {
-        case SupportByExistingChange(c)
-            if data.constraintOf(supportVar.domain.values.head).isSatisfied =>
-          assert3(!(holds.fluent === c.fluent).isViolated)
-          assert3(!(holds.value === c.value).isViolated)
-          ConstraintSatisfaction.SATISFIED
-        case _ => ConstraintSatisfaction.UNDEFINED
-      }
-    } else if (supportVar.domain.isEmpty)
-      ConstraintSatisfaction.VIOLATED
-    else
-      ConstraintSatisfaction.UNDEFINED
+    supportVar.typ.static.instances.find {
+        case SupportByExistingChange(c) if supportConstraintForChange(c).isSatisfied=> true
+        case _ => false
+    } match  {
+      case Some(_) => ConstraintSatisfaction.SATISFIED
+      case None if supportVar.domain.isEmpty => ConstraintSatisfaction.VIOLATED
+      case _ => ConstraintSatisfaction.UNDEFINED
+    }
   }
 
   override def propagate(event: Event)(implicit csp: CSPView): PropagationResult = {
@@ -67,7 +62,7 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
               // actual support and decision was made (absent from domain), post the support constraint.
               val c = data.constraintOf(domainValue)
               if (c.isSatisfied)
-                Satisfied()
+                Satisfied(RetractDecision(decision))
               else
                 Undefined(Post(c), Watch(c))
             case SupportByActionInsertion(_) =>
@@ -86,17 +81,8 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
         val i       = d.indexOf(c)
         val support = t.static.intToInstance(i)
         support match {
-          case SupportByExistingChange(change) =>
-            // enforce, the constraint is exclusive of any other support
-            if(!supportVar.domain.contains(i)) {
-              assert3(isSatisfied)
-              logger.warn("A support is entailed but not in the support variable domain. THis branch should be a dead-end.")
-              Satisfied()
-            } else if(supportVar.boundTo(i)) {
-              Satisfied()
-            } else {
-              Satisfied(UpdateDomain(supportVar, Domain(i)))
-            }
+          case SupportByExistingChange(_) =>
+            Satisfied(RetractDecision(decision))
           case SupportByActionInsertion(aps) =>
             // ignore, even if it is satisfied it does not mean we have no other options
             Undefined()
