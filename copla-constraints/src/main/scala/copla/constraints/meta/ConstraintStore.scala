@@ -14,34 +14,34 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
 
   def this(_csp: CSP) = this(_csp, None)
 
-  val active: mutable.SortedSet[Constraint] = toClone match {
-    case None       => mutable.SortedSet[Constraint]()
+  val active: mutable.Set[Constraint] = toClone match {
+    case None       => mutable.Set[Constraint]()
     case Some(base) => base.active.clone()
   }
 
-  val satisfied: mutable.SortedSet[Constraint] = toClone match {
-    case None       => mutable.SortedSet[Constraint]()
+  val satisfied: mutable.Set[Constraint] = toClone match {
+    case None       => mutable.Set[Constraint]()
     case Some(base) => base.satisfied.clone()
   }
 
-  private val activeConstraintsForVar: mutable.Map[IVar, mutable.SortedSet[Constraint]] =
+  private val activeConstraintsForVar: mutable.Map[IVar, mutable.Set[Constraint]] =
     toClone match {
       case None       => mutable.Map()
       case Some(base) => base.activeConstraintsForVar.map(kv => (kv._1, kv._2.clone()))
     }
 
-  private val watchedConstraintsForVar: mutable.Map[IVar, mutable.SortedSet[Constraint]] =
+  private val watchedConstraintsForVar: mutable.Map[IVar, mutable.Set[Constraint]] =
     toClone match {
       case None       => mutable.Map()
       case Some(base) => base.watchedConstraintsForVar.map(kv => (kv._1, kv._2.clone()))
     }
 
-  private val watchers: mutable.Map[Constraint, mutable.SortedSet[Constraint]] = toClone match {
+  private val watchers: mutable.Map[Constraint, mutable.Set[Constraint]] = toClone match {
     case None       => mutable.Map()
     case Some(base) => base.watchers.map(kv => (kv._1, kv._2.clone()))
   }
 
-  private val watches: mutable.Map[Constraint, mutable.SortedSet[Constraint]] = toClone match {
+  private val watches: mutable.Map[Constraint, mutable.Set[Constraint]] = toClone match {
     case None       => mutable.Map()
     case Some(base) => base.watches.map(kv => (kv._1, kv._2.clone()))
   }
@@ -57,7 +57,7 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
     if(!constraint.active) {
       active += constraint
       for (v <- constraint.variables) {
-        activeConstraintsForVar.getOrElseUpdate(v, mutable.SortedSet()) += constraint
+        activeConstraintsForVar.getOrElseUpdate(v, mutable.Set()) += constraint
       }
     }
   }
@@ -82,9 +82,9 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
     val introductionResult =
       if (!watchers.contains(constraint)) {
         // constraint is not watched yet, record its variable and notify other components
-        watchers.put(constraint, mutable.SortedSet())
+        watchers.put(constraint, mutable.Set())
         for (v <- constraint.variables)
-          watchedConstraintsForVar.getOrElseUpdate(v, mutable.SortedSet()) += constraint
+          watchedConstraintsForVar.getOrElseUpdate(v, mutable.Set()) += constraint
 
         csp.addEvent(WatchConstraint(constraint)) >>
           foreach(constraint.onWatch) {
@@ -96,7 +96,7 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
       }
     introductionResult >> check {
       watchers(constraint) += watcher
-      watches.getOrElseUpdate(watcher, mutable.SortedSet()) += constraint
+      watches.getOrElseUpdate(watcher, mutable.Set()) += constraint
       assert2(watchers(constraint).contains(watcher))
       assert2(watches(watcher).contains(constraint))
     }
