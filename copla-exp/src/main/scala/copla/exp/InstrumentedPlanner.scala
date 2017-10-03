@@ -28,7 +28,7 @@ object InstrumentedPlanner extends App {
   val csp = baseCsp.clone
   csp.addHandler(new Instrumentation())
 
-  val searcher: Searcher = csp => GreedySearcher.search(csp, OptionPicker.randomized(10), ctx => ctx.depth > 80)
+  val searcher: Searcher = csp => GreedySearcher.search(csp, OptionPicker.randomized(10), ctx => ctx.depth > 100)
 
   val lastCSP = searcher.search(csp) match {
     case x@Solution(sol) =>
@@ -41,14 +41,22 @@ object InstrumentedPlanner extends App {
   }
 
   println(
-    lastCSP.getHandler(classOf[Instrumentation]).eventsCount.toSeq
+    lastCSP.getHandler(classOf[Instrumentation]).eventsClassCount.toSeq
       .sortBy(_._2)
       .reverse
       .map { case (event, count) => "%7d".format(count)+"  "+event }
       .mkString("\n")
   )
 
-  val numTests = 1
+  println(
+    lastCSP.getHandler(classOf[Instrumentation]).eventsCount.toSeq
+      .filter(_._2 > 10)
+      .sortBy(_._2)
+      .map { case (event, count) => "%7d".format(count)+"  "+event }
+      .mkString("\n")
+  )
+
+  val numTests = 10
   val startTime = System.currentTimeMillis()
   for(i <- 0 to numTests)
     searcher.search(baseCsp)
