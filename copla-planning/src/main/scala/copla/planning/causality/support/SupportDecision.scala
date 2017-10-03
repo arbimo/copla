@@ -8,18 +8,18 @@ import copla.lang.model.core
 import copla.planning.causality.{CausalHandler, DecisionPending, SupportByActionInsertion, SupportByExistingChange}
 import copla.planning.events.{ActionInsertion, PlanningHandler}
 
-class SupportDecision(supportVar: SupportVar) extends Decision {
+class SupportDecision(val supportVar: SupportVar) extends Decision {
 
-  def context(implicit csp: CSP) : CausalHandler = csp.getHandler(classOf[PlanningHandler]).getHandler(classOf[CausalHandler])
+  def context(implicit csp: CSPView) : CausalHandler = csp.getHandler(classOf[PlanningHandler]).getHandler(classOf[CausalHandler])
 
   /** Returns true is this decision is still pending. */
-  override def pending(implicit csp: CSP): Boolean = {
+  override def pending(implicit csp: CSPView): Boolean = {
     assert3(supportVar.dom.contains(DecisionPending) == supportVar.domain.contains(0))
     supportVar.domain.contains(0)
   }
 
   /** Estimate of the number of options available (typically used for variable ordering). */
-  override def numOptions(implicit csp: CSP): Int = {
+  override def numOptions(implicit csp: CSPView): Int = {
     if(pending)
       supportVar.domain.size -1
     else
@@ -29,7 +29,7 @@ class SupportDecision(supportVar: SupportVar) extends Decision {
   /** Options to advance this decision.
     * Note that the decision can still be pending after applying one of the options.
     * A typical set of options for binary search is [var === val, var =!= val]. */
-  override def options(implicit csp: CSP): Seq[DecisionOption] = {
+  override def options(implicit csp: CSPView): Seq[DecisionOption] = {
     val tmp = supportVar.dom.valuesWithIntRepresentation
     val opts = supportVar.dom.valuesWithIntRepresentation
       .filter(tup => tup._1 != DecisionPending)
