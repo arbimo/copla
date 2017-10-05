@@ -27,6 +27,8 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
     val satisfactions = disjuncts.map(_.satisfaction)
     if (satisfactions.contains(SATISFIED))
       SATISFIED
+    else if(satisfactions.contains(EVENTUALLY_SATISFIED))
+      EVENTUALLY_SATISFIED
     else if (satisfactions.contains(UNDEFINED))
       UNDEFINED
     else

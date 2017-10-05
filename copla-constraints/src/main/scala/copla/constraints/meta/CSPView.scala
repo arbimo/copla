@@ -2,6 +2,7 @@ package copla.constraints.meta
 
 import copla.constraints.meta.constraints.{Change, UpdateDomain}
 import copla.constraints.meta.domains.{Domain, IntervalDomain}
+import copla.constraints.meta.handlers.DomainsStore
 import copla.constraints.meta.stn.core.StnWithStructurals
 import copla.constraints.meta.stn.variables.{TemporalDelay, Timepoint}
 import copla.constraints.meta.types.TypesStore
@@ -19,6 +20,7 @@ trait CSPView {
   def types: TypesStore
   def varStore: VariableStore
   def constraints: ConstraintStore
+  def domains: DomainsStore
   def temporalOrigin: Timepoint
 
   def getHandler[T](clazz: Class[T]): T
@@ -41,6 +43,7 @@ class CSPProxy(view: CSPView, change: Change) extends CSPView {
   override def varStore                     = view.varStore
   override def types                        = view.types
   override def constraints: ConstraintStore = view.constraints
+  override def domains: DomainsStore        = view.domains
   def temporalOrigin: Timepoint             = view.temporalOrigin
 
   override def getHandler[T](clazz: Class[T]): T = view.getHandler(clazz)

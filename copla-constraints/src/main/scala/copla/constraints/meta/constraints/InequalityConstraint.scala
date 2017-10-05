@@ -43,6 +43,8 @@ class VariableInequalityConstraint(override val v1: IntVariable, override val v2
       ConstraintSatisfaction.SATISFIED
     else if (d1.isSingleton && d2.isSingleton && d1 == d2)
       ConstraintSatisfaction.VIOLATED
+    else if(csp.domains.enforcedEqual(v1, v2))
+      ConstraintSatisfaction.EVENTUALLY_VIOLATED
     else
       ConstraintSatisfaction.UNDEFINED
   }

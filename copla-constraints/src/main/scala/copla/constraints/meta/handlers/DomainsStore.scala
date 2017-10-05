@@ -39,6 +39,9 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     case _       => mutable.Set()
   }
 
+  def enforcedEqual(v1: IntVariable, v2: IntVariable): Boolean =
+    recorded(v1) && recorded(v2) && id(v1) == id(v2)
+
   def domOpt(v: IntVariable): Option[Domain] =
     variableIds
       .get(v)

@@ -1,8 +1,8 @@
 package copla.constraints.meta.constraints
 
-import copla.constraints.bindings.InconsistentBindingConstraintNetwork
 import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.events.Event
+import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.{IVar, IntVariable, VariableSeq}
 
 trait EqualityConstraint extends Constraint {
@@ -42,10 +42,12 @@ class VariableEqualityConstraint(override val v1: IntVariable, override val v2: 
     val d1 = csp.dom(v1)
     val d2 = csp.dom(v2)
 
-    if (d1.emptyIntersection(d2))
-      ConstraintSatisfaction.VIOLATED
-    else if (d1.isSingleton && d2.isSingleton && d1.values.head == d2.values.head)
+    if (d1.isSingleton && d2.isSingleton && d1.values.head == d2.values.head)
       ConstraintSatisfaction.SATISFIED
+    else if(csp.domains.enforcedEqual(v1, v2))
+      ConstraintSatisfaction.EVENTUALLY_SATISFIED
+    else if (d1.emptyIntersection(d2))
+      ConstraintSatisfaction.VIOLATED
     else
       ConstraintSatisfaction.UNDEFINED
   }

@@ -1,6 +1,6 @@
 package copla.constraints.meta.constraints
 
-import copla.constraints.meta.constraints.ConstraintSatisfaction.{SATISFIED, UNDEFINED, VIOLATED}
+import copla.constraints.meta.constraints.ConstraintSatisfaction._
 import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.events.Event
 import copla.constraints.meta.variables.IVar
@@ -15,13 +15,19 @@ class ConjunctionConstraint(val constraints: Seq[Constraint]) extends Constraint
 
   override def subconstraints(implicit csp: CSPView) = constraints
 
-  override def satisfaction(implicit csp: CSPView): Satisfaction =
-    if (constraints.forall(_.isSatisfied))
-      ConstraintSatisfaction.SATISFIED
-    else if (constraints.exists(_.isViolated))
-      ConstraintSatisfaction.VIOLATED
+  override def satisfaction(implicit csp: CSPView): Satisfaction = {
+    val satisfactions = constraints.map(_.satisfaction)
+    if (satisfactions.forall(_ == SATISFIED))
+      SATISFIED
+    else if (satisfactions.forall(s => s == SATISFIED || s == EVENTUALLY_SATISFIED))
+      EVENTUALLY_SATISFIED
+    else if (satisfactions.contains(VIOLATED))
+      VIOLATED
+    else if (satisfactions.contains(EVENTUALLY_VIOLATED))
+      EVENTUALLY_VIOLATED
     else
       ConstraintSatisfaction.UNDEFINED
+  }
 
   override def propagate(event: Event)(implicit csp: CSPView) = satisfaction match {
     case SATISFIED => Satisfied()

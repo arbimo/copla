@@ -8,6 +8,9 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 
 class ConstraintTest extends FunSuite with BeforeAndAfter {
 
+  slogging.LoggerConfig.factory = slogging.PrintLoggerFactory()
+  slogging.LoggerConfig.level = slogging.LogLevel.DEBUG
+
   implicit var csp: CSP = null
   var v1, v2: IntVariable = null
 
@@ -45,12 +48,15 @@ class ConstraintTest extends FunSuite with BeforeAndAfter {
 
   test("Constraint propagation equality") {
     val c = v1 === v2
+    csp.post(c)
     val res = c.propagate(NewConstraint(c))
 
     assert(res == Satisfied(UpdateDomain(v1, Domain(2))))
   }
 
   test("Constraint propagation equality in CSP") {
+
+
     csp.post(v1 === v2)
     csp.propagate()
 
