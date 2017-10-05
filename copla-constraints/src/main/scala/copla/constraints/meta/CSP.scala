@@ -51,11 +51,6 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       base.numberOfChildren
   }
 
-  val domains: mutable.Map[VarWithDomain, Domain] = toClone match {
-    case Right(base) => base.domains.clone()
-    case _           => mutable.Map()
-  }
-
   val events: mutable.Queue[Event] = toClone match {
     case Right(base) => base.events.clone()
     case _           => mutable.Queue()
@@ -67,6 +62,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       mutable.ArrayBuffer(new TypesStore(this),
                           new DecisionsHandler(this),
                           configuration.initialHeuristicBuilder(this),
+                          new DomainsStore(),
                           new BindingHandler())
   }
 
@@ -75,6 +71,8 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   val decisions: DecisionsHandler = getHandler(classOf[DecisionsHandler])
 
   val bindings: BindingHandler = getHandler(classOf[BindingHandler])
+
+  val domains: DomainsStore = getHandler(classOf[DomainsStore])
 
   val heuristic: Heuristic = eventHandlers.toList.collect { case x: Heuristic => x } match {
     case h :: Nil => h
@@ -141,31 +139,17 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         defaultTimepointDomain
     }
 
-  def dom(v: IntVariable): Domain =
-    if (domains.contains(v))
-      domains(v)
-    else
-      v.initialDomain
+  def dom(v: IntVariable): Domain = domains.domOpt(v).getOrElse(v.initialDomain)
+
+  def updateDomain(v: IntVariable, newDomain: Domain): Update =
+    domains.updateDomain(v, newDomain).flatMap(
+      foreach(_)(addEvent(_))
+    )
 
   def bind(variable: IntVariable, value: Int) {
     post(variable === value)
   }
 
-  def updateDomain(variable: IntVariable, newDomain: Domain): Update = {
-    logger.debug(s"  dom-update: $variable <- $newDomain")
-    if (newDomain.isEmpty) {
-      fatal("empty domain update")
-    } else if (variable.domain.size > newDomain.size) {
-      domains(variable) = newDomain
-      addEvent(DomainReduced(variable))
-    } else if (variable.domain.size < newDomain.size && !bindings.isBound(variable)) {
-      // domain increase and there is no bindng constraint forbiding its growth
-      domains(variable) = newDomain
-      addEvent(DomainExtended(variable))
-    } else {
-      consistent
-    }
-  }
 
   def propagate(): Update = {
     var result: Update = consistent
@@ -240,7 +224,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       case NewConstraint(c) =>
         assert1(c.active)
         for (v <- c.variables) v match {
-          case v: IntVariable if !domains.contains(v) => addVariable(v)
+          case v: IntVariable if !domains.recorded(v) => addVariable(v)
           case _                                      =>
         }
         foreach(c.onPost) {
@@ -337,7 +321,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   def reified(constraint: Constraint): ReificationVariable = {
     if (!varStore.hasVariableForRef(constraint)) {
       val variable = varStore.getReificationVariable(constraint)
-      domains.put(variable, new BooleanDomain(Set(false, true)))
+      domains.setDomain(variable, new BooleanDomain(Set(false, true)))
       post(new ReificationConstraint(variable, constraint))
     }
     varStore.getReificationVariable(constraint)
@@ -362,7 +346,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
 
   def addVariable(variable: IntVariable): Update = {
     assert1(!hasVariable(variable))
-    domains.put(variable, variable.initialDomain)
+    domains.setDomain(variable, variable.initialDomain)
     if (variable.ref.nonEmpty)
       varStore.setVariableForRef(variable.ref.get, variable)
     variableAdded(variable)
@@ -372,7 +356,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   /** Records an event notifying of the variable addition + some sanity checks */
   def variableAdded(variable: IVar) {
     variable match {
-      case v: IntVariable => assert2(domains.contains(v), "Variable has no domain")
+      case v: IntVariable => assert2(domains.recorded(v), "Variable has no domain")
       case _              =>
     }
     addEvent(NewVariableEvent(variable))
@@ -384,7 +368,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     consistent
   }
 
-  def hasVariable(variable: IntVariable): Boolean = domains.contains(variable)
+  def hasVariable(variable: IntVariable): Boolean = domains.recorded(variable)
 
   def nextVarId() = VariableStore.nextVariableId()
 
