@@ -22,7 +22,7 @@ import scala.util.{Failure, Success, Try}
 import updates._
 import cats.implicits._
 import copla.constraints.meta.constraints.specialization.Specialization
-import copla.constraints.meta.handlers.BindingHandler
+import copla.constraints.meta.handlers.DomainsStore
 
 class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     extends Ordered[CSP]
@@ -62,15 +62,12 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       mutable.ArrayBuffer(new TypesStore(this),
                           new DecisionsHandler(this),
                           configuration.initialHeuristicBuilder(this),
-                          new DomainsStore(),
-                          new BindingHandler())
+                          new DomainsStore())
   }
 
   val types: TypesStore = getHandler(classOf[TypesStore])
 
   val decisions: DecisionsHandler = getHandler(classOf[DecisionsHandler])
-
-  val bindings: BindingHandler = getHandler(classOf[BindingHandler])
 
   val domains: DomainsStore = getHandler(classOf[DomainsStore])
 

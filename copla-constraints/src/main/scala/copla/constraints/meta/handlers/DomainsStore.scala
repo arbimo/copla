@@ -1,5 +1,7 @@
-package copla.constraints.meta
+package copla.constraints.meta.handlers
 
+import copla.constraints.meta.CSP
+import copla.constraints.meta.constraints.BindConstraint
 import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.events._
 import copla.constraints.meta.updates._
@@ -18,6 +20,11 @@ class DomainsStore(base: Option[DomainsStore] = None) extends InternalCSPEventHa
   val variableIds: mutable.Map[VarWithDomain, Int] = base match {
     case Some(base) => base.variableIds.clone()
     case _           => mutable.Map()
+  }
+
+  val boundVariables: mutable.Set[IntVariable] = base match {
+    case Some(x) => x.boundVariables.clone()
+    case _ => mutable.Set()
   }
 
   def domOpt(v: IntVariable): Option[Domain] =
@@ -54,12 +61,12 @@ class DomainsStore(base: Option[DomainsStore] = None) extends InternalCSPEventHa
     } else if (dom(variable).size > newDomain.size) {
       setDomainImpl(variable, newDomain)
       consistent(Seq(DomainReduced(variable)))
-    } else if (dom(variable).size < newDomain.size) { // TODO merge with bindings: && !bindings.isBound(variable)) {
+    } else if (dom(variable).size < newDomain.size && !isBound(variable)) {
       // domain increase and there is no bindng constraint forbiding its growth
       setDomainImpl(variable, newDomain)
       consistent(Seq(DomainExtended(variable)))
     } else {
-      assert3(dom(variable) == newDomain)
+      assert3(isBound(variable) || dom(variable) == newDomain)
       consistent(Nil)
     }
   }
@@ -69,6 +76,14 @@ class DomainsStore(base: Option[DomainsStore] = None) extends InternalCSPEventHa
   override def clone(newCSP: CSP): InternalCSPEventHandler =
     new DomainsStore(Some(this))
 
-  override def handleEvent(event: Event): Update = consistent // TODO
+  def isBound(variable: IntVariable): Boolean = boundVariables.contains(variable)
+
+  override def handleEvent(event: Event): Update = event match {
+    case NewConstraint(c: BindConstraint) =>
+      boundVariables += c.variable
+      consistent
+    case _ =>
+      consistent
+  }
 
 }
