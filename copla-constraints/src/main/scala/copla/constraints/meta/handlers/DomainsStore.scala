@@ -29,6 +29,11 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     case _          => mutable.Map()
   }
 
+  val variablesById: mutable.Map[Int, mutable.Set[IntVariable]] = base match {
+    case Some(x) => mutable.Map(x.variablesById.toSeq.map(p => (p._1, p._2.clone())): _*)
+    case _ => mutable.Map()
+  }
+
   val boundVariables: mutable.Set[IntVariable] = base match {
     case Some(x) => x.boundVariables.clone()
     case _       => mutable.Set()
@@ -48,6 +53,13 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     setDomainImpl(variable, domain)
   }
 
+  private def setId(variable: IntVariable, newId: Int): Unit = {
+    if(variableIds.contains(variable))
+      variablesById(id(variable)) -= variable
+    variableIds(variable) = newId
+    variablesById.getOrElseUpdate(newId, mutable.Set()) += variable
+  }
+
   private def setDomainImpl(variable: IntVariable, domain: Domain): Unit = {
     val id = variableIds.get(variable) match {
       case Some(x) => x
@@ -55,11 +67,11 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
         val newId = emptySpots.head
         emptySpots -= newId
         assert3(domainsById(newId) == null)
-        variableIds(variable) = newId
+        setId(variable, newId)
         newId
       case _ =>
         val newId = domainsById.size
-        variableIds(variable) = newId
+        setId(variable, newId)
         newId
     }
     assert2(id <= domainsById.size)
@@ -98,7 +110,10 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
 
   private def id(v: IntVariable): Int = variableIds(v)
 
-  private def varsWithId(id: Int): Set[IntVariable] = variableIds.toSeq.filter(_._2 == id).map(_._1).toSet
+  private def varsWithId(id: Int): collection.Set[IntVariable] = {
+    assert3(variableIds.toSeq.filter(_._2 == id).map(_._1).toSet == variablesById(id))
+    variablesById(id)
+  }
 
   override def handleEvent(event: Event): Update = event match {
     case NewConstraint(c: BindConstraint) =>
@@ -115,7 +130,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
             (if(commonDomain.size != dom(right).size) varsWithId(rid) else Set())
 
         for(v <- varsWithId(rid))
-          variableIds(v) = lid
+          setId(v, lid)
         assert3(varsWithId(rid).isEmpty)
         emptySpots += rid
         domainsById(rid) = null
