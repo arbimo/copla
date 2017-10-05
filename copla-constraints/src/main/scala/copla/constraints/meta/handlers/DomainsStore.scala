@@ -113,9 +113,9 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
 
   private def id(v: IntVariable): Int = variableIds(v)
 
-  private def varsWithId(id: Int): collection.Set[IntVariable] = {
+  private def varsWithId(id: Int): Seq[IntVariable] = {
     assert3(variableIds.toSeq.filter(_._2 == id).map(_._1).toSet == variablesById(id))
-    variablesById(id)
+    variablesById(id).toSeq
   }
 
   override def handleEvent(event: Event): Update = event match {
@@ -132,8 +132,9 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
           (if(commonDomain.size < dom(left).size) varsWithId(lid) else Set()) ++
             (if(commonDomain.size != dom(right).size) varsWithId(rid) else Set())
 
-        for(v <- varsWithId(rid))
+        for(v <- varsWithId(rid)) {
           setId(v, lid)
+        }
         assert3(varsWithId(rid).isEmpty)
         emptySpots += rid
         domainsById(rid) = null
