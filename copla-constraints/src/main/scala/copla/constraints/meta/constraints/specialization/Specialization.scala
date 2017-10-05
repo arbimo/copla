@@ -57,8 +57,8 @@ object Specialization {
         contradiction(c)
 
       case c: DisjunctiveConstraint =>
-        val disjuncts = c.disjuncts.map(sc => specialize(sc)).filterNot(_.isViolated)
-        if(disjuncts.exists(_.isSatisfied))
+        val disjuncts = c.disjuncts.map(sc => specialize(sc)).filterNot(_.eventuallyViolated)
+        if(disjuncts.exists(_.eventuallySatisfied))
           tautology(c)
         else if(disjuncts.isEmpty)
           contradiction(c)
@@ -66,10 +66,10 @@ object Specialization {
           spec(new DisjunctiveConstraint(disjuncts), c)
 
       case c: ConjunctionConstraint =>
-        val conjuncts = c.constraints.map(specialize).filterNot(_.isSatisfied)
+        val conjuncts = c.constraints.map(specialize).filterNot(_.eventuallySatisfied)
         if(conjuncts.isEmpty)
           tautology(c)
-        else if(conjuncts.exists(_.isViolated))
+        else if(conjuncts.exists(_.eventuallyViolated))
           contradiction(c)
         else
           spec(new ConjunctionConstraint(conjuncts), c)

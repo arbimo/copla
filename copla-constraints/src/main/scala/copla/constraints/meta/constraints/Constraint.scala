@@ -28,6 +28,10 @@ trait Constraint extends Ordered[Constraint] {
 
   final def isSatisfied(implicit csp: CSPView): Boolean = satisfaction == ConstraintSatisfaction.SATISFIED
 
+  final def eventuallySatisfied(implicit csp: CSPView): Boolean = satisfaction.isInstanceOf[EventuallySatisfied]
+
+  final def eventuallyViolated(implicit csp: CSPView): Boolean = satisfaction.isInstanceOf[EventuallyViolated]
+
   final def isViolated(implicit csp: CSPView): Boolean = satisfaction == ConstraintSatisfaction.VIOLATED
 
   final def isUndefined(implicit csp: CSPView): Boolean = satisfaction == ConstraintSatisfaction.UNDEFINED
