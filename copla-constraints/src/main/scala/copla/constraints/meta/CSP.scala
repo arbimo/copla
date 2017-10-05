@@ -62,7 +62,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       mutable.ArrayBuffer(new TypesStore(this),
                           new DecisionsHandler(this),
                           configuration.initialHeuristicBuilder(this),
-                          new DomainsStore())
+                          new DomainsStore(this))
   }
 
   val types: TypesStore = getHandler(classOf[TypesStore])
