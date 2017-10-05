@@ -42,8 +42,8 @@ class ExtensionConstraint(_variables: Seq[IntVariable], extDomain: ExtensionDoma
       val lookahead = csp ++ changes
       satisfaction(lookahead) match {
         case SATISFIED => Satisfied(changes)
-        case UNDEFINED => Undefined(changes)
         case VIOLATED  => Inconsistency
+        case _ => Undefined(changes)
       }
     }
   }

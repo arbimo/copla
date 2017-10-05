@@ -24,9 +24,9 @@ class ConjunctionConstraint(val constraints: Seq[Constraint]) extends Constraint
       ConstraintSatisfaction.UNDEFINED
 
   override def propagate(event: Event)(implicit csp: CSPView) = satisfaction match {
-    case UNDEFINED => Undefined()
     case SATISFIED => Satisfied()
     case VIOLATED  => Inconsistency
+    case _ => Undefined()
   }
 
   override def toString = "(" + constraints.mkString(" && ") + ")"

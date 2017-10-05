@@ -84,14 +84,27 @@ object Constraint {
 
 /** Enum like trait to represent the status of a constraint in a given network. */
 sealed trait ConstraintSatisfaction
+sealed trait EventuallySatisfied extends ConstraintSatisfaction
+sealed trait EventuallyViolated extends ConstraintSatisfaction
 
 object ConstraintSatisfaction {
-  object SATISFIED extends ConstraintSatisfaction {
+
+  object SATISFIED extends EventuallySatisfied {
     override val toString: String = "satisfied"
   }
-  object VIOLATED  extends ConstraintSatisfaction {
+
+  object EVENTUALLY_SATISFIED extends EventuallySatisfied {
+    override val toString: String = "ev-satisfied"
+  }
+
+  object VIOLATED  extends EventuallyViolated {
     override val toString: String = "violated"
   }
+
+  object EVENTUALLY_VIOLATED extends EventuallyViolated {
+    override val toString: String = "ev-violated"
+  }
+
   object UNDEFINED extends ConstraintSatisfaction {
     override val toString: String = "undefined"
   }
