@@ -24,17 +24,17 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     case _       => mutable.Set()
   }
 
-  val variableIds: mutable.Map[IntVariable, Int] = base match {
+  private val variableIds: mutable.Map[IntVariable, Int] = base match {
     case Some(base) => base.variableIds.clone()
     case _          => mutable.Map()
   }
 
-  val variablesById: mutable.Map[Int, mutable.Set[IntVariable]] = base match {
+  private val variablesById: mutable.Map[Int, mutable.Set[IntVariable]] = base match {
     case Some(x) => mutable.Map(x.variablesById.toSeq.map(p => (p._1, p._2.clone())): _*)
     case _ => mutable.Map()
   }
 
-  val boundVariables: mutable.Set[IntVariable] = base match {
+  private val boundVariables: mutable.Set[IntVariable] = base match {
     case Some(x) => x.boundVariables.clone()
     case _       => mutable.Set()
   }
@@ -143,5 +143,4 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     case _ =>
       consistent
   }
-
 }
