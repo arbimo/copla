@@ -1,18 +1,14 @@
 package copla.planning.causality.support
 
 import copla.constraints.meta.CSPView
+import copla.constraints.meta.constraints.ConstraintSatisfaction.{EVENTUALLY_SATISFIED, SATISFIED, UNDEFINED, VIOLATED}
 import copla.constraints.meta.constraints._
 import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.events._
 import copla.constraints.meta.types.dynamics.DynamicType
 import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.IVar
-import copla.planning.causality.{
-  DecisionPending,
-  SupportByActionInsertion,
-  SupportByExistingChange,
-  SupportOption
-}
+import copla.planning.causality.{DecisionPending, SupportByActionInsertion, SupportByExistingChange, SupportOption}
 import copla.planning.structures.{Change, Holds}
 
 /** Constraint enforcing the given `holds` to be supported by a Change. */
@@ -36,14 +32,17 @@ class SupportConstraint(t: DynamicType[SupportOption], val holds: Holds)
   override def variables(implicit csp: CSPView): Set[IVar] = Set(supportVar)
 
   override def satisfaction(implicit csp: CSPView): Satisfaction = {
-    supportVar.typ.static.instances.find {
-        case SupportByExistingChange(c) if supportConstraintForChange(c).isSatisfied=> true
-        case _ => false
-    } match  {
-      case Some(_) => ConstraintSatisfaction.SATISFIED
-      case None if supportVar.domain.isEmpty => ConstraintSatisfaction.VIOLATED
-      case _ => ConstraintSatisfaction.UNDEFINED
+    val directSupportSatisfactions = supportVar.typ.static.instances.collect {
+        case SupportByExistingChange(c) => supportConstraintForChange(c).satisfaction
     }
+    if(directSupportSatisfactions.contains(SATISFIED))
+      SATISFIED
+    else if(directSupportSatisfactions.contains(EVENTUALLY_SATISFIED))
+      EVENTUALLY_SATISFIED
+    else if(supportVar.domain.isEmpty)
+      VIOLATED
+    else
+      UNDEFINED
   }
 
   override def propagate(event: Event)(implicit csp: CSPView): PropagationResult = {

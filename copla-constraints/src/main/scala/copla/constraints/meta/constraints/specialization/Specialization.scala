@@ -21,7 +21,8 @@ class Specialization private (val specialized: Constraint, val general: Constrai
     specialized.propagate(event)
 
   override def satisfaction(implicit csp: CSPView): Satisfaction = {
-    assert3(general.isUndefined || specialized.satisfaction == general.satisfaction)
+    assert3(general.isUndefined || specialized.eventuallySatisfied == general.eventuallySatisfied
+      || specialized.eventuallyViolated == general.eventuallyViolated)
     specialized.satisfaction
   }
 

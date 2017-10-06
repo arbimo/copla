@@ -11,6 +11,9 @@ import copla.planning.search.DecisionOrderings
 
 object InstrumentedPlanner extends App {
 
+  slogging.LoggerConfig.factory = slogging.SLF4JLoggerFactory()
+  slogging.LoggerConfig.level = slogging.LogLevel.DEBUG
+
   val pbFile = new File(defaultExpDir, "handover-flat.p01.pb.anml")
 
 
@@ -29,7 +32,8 @@ object InstrumentedPlanner extends App {
   val csp = baseCsp.clone
   csp.addHandler(new Instrumentation())
 
-  val searcher: Searcher = csp => GreedySearcher.search(csp, DecisionOrderings.default, OptionPicker.randomized(10), ctx => ctx.depth > 100)
+  val searcher: Searcher = csp =>
+    GreedySearcher.search(csp, DecisionOrderings.default, OptionPicker.randomized(10), ctx => ctx.depth > 46)
 
   val lastCSP = searcher.search(csp) match {
     case x@Solution(sol) =>
@@ -57,13 +61,13 @@ object InstrumentedPlanner extends App {
       .mkString("\n")
   )
 
-  val numTests = 100
-  val startTime = System.currentTimeMillis()
-  for(i <- 0 to numTests)
-    searcher.search(baseCsp)
-  val endTime = System.currentTimeMillis()
-  val runtime = (endTime - startTime) / numTests
+//  val numTests = 100
+//  val startTime = System.currentTimeMillis()
+//  for(i <- 0 to numTests)
+//    searcher.search(baseCsp)
+//  val endTime = System.currentTimeMillis()
+//  val runtime = (endTime - startTime) / numTests
 
-  println(s"Runtime: $runtime")
+//  println(s"Runtime: $runtime")
 
 }

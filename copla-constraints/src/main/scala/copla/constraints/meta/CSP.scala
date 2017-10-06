@@ -171,7 +171,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
             }
             .mkString("\n")
       )
-      assert3(constraints.satisfied.forall(_.isSatisfied),
+      assert3(constraints.satisfied.forall(_.eventuallySatisfied),
               "A constraint is not satisfied while in the satisfied list")
 
       if (isSolution) {
@@ -204,7 +204,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       case Satisfied(changes) =>
         foreach(changes)(applyChange) >>
           setSatisfied(constraint) <<
-          assert3(constraint.isSatisfied)
+          assert3(constraint.eventuallySatisfied)
       case Undefined(changes) =>
         foreach(changes)(applyChange)
       case Inconsistency =>
@@ -241,9 +241,9 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         }) >>
           foreach(constraints.monitoredWatching(e.variable))(c => {
             assert2(c.watched)
-            if (c.isSatisfied)
+            if (c.eventuallySatisfied)
               addEvent(WatchedSatisfied(c))
-            else if (c.isViolated)
+            else if (c.eventuallyViolated)
               addEvent(WatchedViolated(c))
             else
               consistent
@@ -260,9 +260,9 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
 
           // if it is watch, signal whether it is
           if (c.watched) {
-            if (c.isSatisfied)
+            if (c.eventuallySatisfied)
               addEvent(WatchedSatisfied(c))
-            else if (c.isViolated)
+            else if (c.eventuallyViolated)
               addEvent(WatchedViolated(c))
           }
           propagationRes
@@ -278,9 +278,9 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           consistent
       // handled by constraint store
       case WatchConstraint(c) if c.watched => // already watched
-        if (c.isSatisfied)
+        if (c.eventuallySatisfied)
           addEvent(WatchedSatisfied(c))
-        else if (c.isViolated)
+        else if (c.eventuallyViolated)
           addEvent(WatchedViolated(c))
         else
           consistent
@@ -325,7 +325,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   }
 
   def setSatisfied(constraint: Constraint): Update = {
-    assert2(constraint.isSatisfied, s"Constraint $constraint is not satisfied but ${constraint.satisfaction}")
+    assert2(constraint.eventuallySatisfied, s"Constraint $constraint is not (eventually) satisfied but ${constraint.satisfaction}")
     addEvent(Satisfaction(constraint))
   }
 

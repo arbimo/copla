@@ -42,15 +42,15 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
     } else {
       event match {
         case WatchedSatisfied(c) =>
-          assert3(c.isSatisfied)
-          assert3(isSatisfied)
+          assert3(c.eventuallySatisfied)
+          assert3(eventuallySatisfied)
           Satisfied(RetractDecision(decision))
 
         case WatchedViolated(c) =>
-          assert3(c.isViolated)
+          assert3(c.eventuallyViolated)
           val id = disjuncts.indexOf(c)
           if (decisionVar.boundTo(id)) {
-            assert3(isViolated)
+            assert3(eventuallyViolated)
             Inconsistency
           } else if (dom.contains(id)) {
             Undefined(UpdateDomain(decisionVar, dom - id))
@@ -68,12 +68,12 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
             Undefined()
           }
         case NewConstraint(_) =>
-          decisionVar.domain.values.find(i => disjuncts(i).isSatisfied) match {
+          decisionVar.domain.values.find(i => disjuncts(i).eventuallySatisfied) match {
             case Some(_) =>
-              assert3(isSatisfied)
+              assert3(eventuallySatisfied)
               Satisfied(RetractDecision(decision))
             case None =>
-              assert3(!isSatisfied)
+              assert3(!eventuallySatisfied)
               Undefined()
           }
       }

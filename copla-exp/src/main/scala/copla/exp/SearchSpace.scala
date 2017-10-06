@@ -12,12 +12,11 @@ import copla.planning.search.DecisionOrderings.SeqFeatures
 import copla.planning.search.{DecisionFeatures, DecisionOrderings}
 
 import scala.collection.mutable
-import scala.util.Random
 
 object SearchSpace extends App {
 
 
-  val numTentatives = 2000
+  val numTentatives = 20
   val numOrderings = 6
 
   val results: mutable.ArrayBuffer[(String, String, Int)] = mutable.ArrayBuffer()
