@@ -87,7 +87,4 @@ object SearchSpace extends App {
 
     SeqFeatures(features)
   }
-
 }
-
-

@@ -38,8 +38,8 @@ sealed trait PropagationResult
 object PropagationResult {
   def from(satisfaction: ConstraintSatisfaction) = satisfaction match {
     case ConstraintSatisfaction.SATISFIED => Satisfied()
-    case ConstraintSatisfaction.UNDEFINED => Undefined()
     case ConstraintSatisfaction.VIOLATED  => Inconsistency
+    case _ => Undefined()
   }
 }
 
