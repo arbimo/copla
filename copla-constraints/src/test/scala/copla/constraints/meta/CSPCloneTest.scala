@@ -41,7 +41,6 @@ class CSPCloneTest extends FunSuite with BeforeAndAfter {
 
     csp.post(v1 === v3)
     csp.propagate()
-    assert(!r.isTrue)
     assert(!r.isFalse)
   }
 

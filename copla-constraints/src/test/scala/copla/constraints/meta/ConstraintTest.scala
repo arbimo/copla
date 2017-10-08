@@ -9,7 +9,7 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 class ConstraintTest extends FunSuite with BeforeAndAfter {
 
   slogging.LoggerConfig.factory = slogging.PrintLoggerFactory()
-  slogging.LoggerConfig.level = slogging.LogLevel.DEBUG
+  slogging.LoggerConfig.level = slogging.LogLevel.WARN
 
   implicit var csp: CSP = null
   var v1, v2: IntVariable = null
