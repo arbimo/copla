@@ -14,6 +14,8 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     extends InternalCSPEventHandler
     with slogging.LazyLogging {
 
+  type DomainID = Int
+
   private val domainsById: mutable.ArrayBuffer[Domain] = base match {
     case Some(base) => base.domainsById.clone()
     case _          => mutable.ArrayBuffer()
@@ -21,7 +23,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
 
   /** Tracks which of the domains are ID are free. A free domain ID is materialized by a null value in the
     * domainsById array. This ID might be reused for a new variable. */
-  private val emptySpots: mutable.Set[Int] = base match {
+  private val emptySpots: mutable.Set[DomainID] = base match {
     case Some(x) => x.emptySpots.clone()
     case _       => mutable.Set()
   }
@@ -29,12 +31,12 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
   /** Associates each variable with a given domain ID which can be used
     * (i) to retrieve its domain from domainsById.
     * (ii) to test for entailed equality (two variables with the same domain ID where enforced to be equal. */
-  private val variableIds: mutable.Map[IntVariable, Int] = base match {
+  private val variableIds: mutable.Map[IntVariable, DomainID] = base match {
     case Some(base) => base.variableIds.clone()
     case _          => mutable.Map()
   }
 
-  private val variablesById: mutable.Map[Int, mutable.Set[IntVariable]] = base match {
+  private val variablesById: mutable.Map[DomainID, mutable.Set[IntVariable]] = base match {
     case Some(x) => mutable.Map(x.variablesById.toSeq.map(p => (p._1, p._2.clone())): _*)
     case _ => mutable.Map()
   }
@@ -68,7 +70,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     setDomainImpl(variable, domain)
   }
 
-  private def setId(variable: IntVariable, newId: Int): Unit = {
+  private def setId(variable: IntVariable, newId: DomainID): Unit = {
     if(variableIds.contains(variable))
       variablesById(id(variable)) -= variable
     variableIds(variable) = newId
@@ -125,7 +127,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
 
   private def id(v: IntVariable): Int = variableIds(v)
 
-  private def varsWithId(id: Int): Seq[IntVariable] = {
+  private def varsWithId(id: DomainID): Seq[IntVariable] = {
     assert3(variableIds.toSeq.filter(_._2 == id).map(_._1).toSet == variablesById(id))
     variablesById(id).toSeq
   }
