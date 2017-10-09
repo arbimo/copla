@@ -11,8 +11,8 @@ import copla.planning.search.DecisionOrderings
 
 object InstrumentedPlanner extends App {
 
-  slogging.LoggerConfig.factory = slogging.SLF4JLoggerFactory()
-  slogging.LoggerConfig.level = slogging.LogLevel.DEBUG
+  slogging.LoggerConfig.factory = slogging.PrintLoggerFactory()
+  slogging.LoggerConfig.level = slogging.LogLevel.WARN
 
   val pbFile = new File(defaultExpDir, "handover-flat.p01.pb.anml")
 

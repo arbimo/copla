@@ -16,6 +16,9 @@ import scala.collection.mutable
 object SearchSpace extends App {
 
 
+  slogging.LoggerConfig.factory = slogging.PrintLoggerFactory()
+  slogging.LoggerConfig.level = slogging.LogLevel.WARN
+
   val numTentatives = 20
   val numOrderings = 6
 
