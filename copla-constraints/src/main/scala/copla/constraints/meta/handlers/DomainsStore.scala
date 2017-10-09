@@ -88,7 +88,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
   def updateDomain(variable: IntVariable, newDomain: Domain): UpdateResult[Seq[DomainChange]] = {
     logger.debug(s"  dom-update: $variable <- $newDomain")
     if (newDomain.isEmpty) {
-      fatal("empty domain update")
+      inconsistent(s"Empty domain update for variable $variable")
     } else if (!recorded(variable)) {
       setDomainImpl(variable, newDomain)
       consistent(Nil)
@@ -128,19 +128,23 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
         val lid = id(left)
         val rid = id(right)
         val commonDomain = dom(left).intersection(dom(right))
-        val changedVariables =
-          (if(commonDomain.size < dom(left).size) varsWithId(lid) else Set()) ++
-            (if(commonDomain.size != dom(right).size) varsWithId(rid) else Set())
+        if(commonDomain.isEmpty) {
+          inconsistent(s"Equality constraint $x resulted in ${x.v1} and ${x.v2} having an empty domain.")
+        } else {
+          val changedVariables =
+            (if (commonDomain.size < dom(left).size) varsWithId(lid) else Set()) ++
+              (if (commonDomain.size != dom(right).size) varsWithId(rid) else Set())
 
-        for(v <- varsWithId(rid)) {
-          setId(v, lid)
+          for (v <- varsWithId(rid)) {
+            setId(v, lid)
+          }
+          assert3(varsWithId(rid).isEmpty)
+          emptySpots += rid
+          domainsById(rid) = null
+          domainsById(lid) = commonDomain
+
+          foreach(changedVariables)(v => csp.addEvent(DomainReduced(v)))
         }
-        assert3(varsWithId(rid).isEmpty)
-        emptySpots += rid
-        domainsById(rid) = null
-        domainsById(lid) = commonDomain
-
-        foreach(changedVariables)(v => csp.addEvent(DomainReduced(v)))
       case _ =>
         consistent
     }

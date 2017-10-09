@@ -20,11 +20,11 @@ class ExtensionConstraint(_variables: Seq[IntVariable], extDomain: ExtensionDoma
     if (domains.forall(_.isSingleton)) {
       val values = domains.map(_.values.head)
       if (extDomain.hasTuple(values))
-        ConstraintSatisfaction.SATISFIED
+        SATISFIED
       else
-        ConstraintSatisfaction.VIOLATED
+        VIOLATED
     } else {
-      ConstraintSatisfaction.UNDEFINED
+      UNDEFINED
     }
   }
 
