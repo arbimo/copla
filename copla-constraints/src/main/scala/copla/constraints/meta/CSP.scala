@@ -208,7 +208,7 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       case Undefined(changes) =>
         foreach(changes)(applyChange)
       case Inconsistency =>
-        assert3(constraint.eventuallyViolated, s"Constraint $constraint returned inconsistent but is not eventually violated.")
+        assert3(constraint.eventuallyViolated, s"Constraint $constraint returned inconsistent while not eventually violated but ${constraint.satisfaction}.")
         inconsistent(s"Inconsistency detected during propagation of $constraint")
     }
   }

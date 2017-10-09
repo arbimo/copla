@@ -8,17 +8,19 @@ import copla.constraints.meta.events.Event
 import copla.constraints.meta.variables.{IVar, IntVariable}
 
 /** A constraint on N variables that must take as values one of the N-tuples in an ExtensionDomain*/
-class ExtensionConstraint(_variables: Seq[IntVariable], extDomain: ExtensionDomain)
-    extends Constraint {
+class ExtensionConstraint(_variables: Seq[IntVariable], extDomain: ExtensionDomain) extends Constraint {
 
   override def toString: String = s"ext-constraint([${_variables.mkString(",")}] <=> $extDomain"
 
   override def variables(implicit csp: CSPView): Set[IVar] = _variables.toSet
 
   override def satisfaction(implicit csp: CSPView): Satisfaction = {
-    val domains = _variables.map(_.domain)
-    if (domains.forall(_.isSingleton)) {
-      val values = domains.map(_.values.head)
+    val initialDomains    = _variables.map(_.domain)
+    val restrictedDomains = extDomain.restrictedDomains(initialDomains)
+    if (restrictedDomains.exists(_.isEmpty)) {
+      VIOLATED
+    } else if (restrictedDomains.forall(_.isSingleton)) {
+      val values = restrictedDomains.map(_.values.head)
       if (extDomain.hasTuple(values))
         SATISFIED
       else
@@ -43,7 +45,7 @@ class ExtensionConstraint(_variables: Seq[IntVariable], extDomain: ExtensionDoma
       satisfaction(lookahead) match {
         case SATISFIED => Satisfied(changes)
         case VIOLATED  => Inconsistency
-        case _ => Undefined(changes)
+        case _         => Undefined(changes)
       }
     }
   }
