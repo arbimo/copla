@@ -19,11 +19,16 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     case _          => mutable.ArrayBuffer()
   }
 
+  /** Tracks which of the domains are ID are free. A free domain ID is materialized by a null value in the
+    * domainsById array. This ID might be reused for a new variable. */
   private val emptySpots: mutable.Set[Int] = base match {
     case Some(x) => x.emptySpots.clone()
     case _       => mutable.Set()
   }
 
+  /** Associates each variable with a given domain ID which can be used
+    * (i) to retrieve its domain from domainsById.
+    * (ii) to test for entailed equality (two variables with the same domain ID where enforced to be equal. */
   private val variableIds: mutable.Map[IntVariable, Int] = base match {
     case Some(base) => base.variableIds.clone()
     case _          => mutable.Map()
@@ -39,6 +44,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     case _       => mutable.Set()
   }
 
+  /** Returns true if the two variables are subject to an equality constraint. */
   def enforcedEqual(v1: IntVariable, v2: IntVariable): Boolean =
     recorded(v1) && recorded(v2) && id(v1) == id(v2)
 
@@ -47,12 +53,18 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
       .get(v)
       .map(id => domainsById(id))
 
+  /** Returns the domain of a variable. Throws if the variable has no recorded domain. */
   private def dom(v: IntVariable): Domain = domainsById(variableIds(v))
 
+  /** Returns true if the variable has been previously recorded (i.e. is associated with a domain). */
   def recorded(v: IntVariable): Boolean = variableIds.contains(v)
 
+  /** Set the domain of the given variable.
+    * Require that the variable was not previously recorded and that domain is not empty.
+    * When this is not provable, one should use updateDomain instead. */
   def setDomain(variable: IntVariable, domain: Domain): Unit = {
     require(!recorded(variable))
+    require(domain.nonEmpty)
     setDomainImpl(variable, domain)
   }
 
