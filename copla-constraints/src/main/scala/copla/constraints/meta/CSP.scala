@@ -163,11 +163,11 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
     check {
       assert1(events.isEmpty, "Can't sanity check: CSP has pending events")
       check3(
-        constraints.active.forall(c => c.satisfaction == ConstraintSatisfaction.UNDEFINED),
+        constraints.active.forall(c => !c.isSatisfied && !c.isViolated),
         "Satisfaction of an active constraint is not UNDEFINED:\n " +
           constraints.active
             .collect {
-              case c if !c.isUndefined => c + " : " + c.satisfaction
+              case c if c.isSatisfied || c.isViolated => c + " : " + c.satisfaction
             }
             .mkString("\n")
       )
