@@ -9,7 +9,7 @@ sealed trait SearchResult {
 }
 
 case class Solution(csp: CSP) extends SearchResult {
-  assert3(csp.isSolution)
+  assert3(csp.isSolution, s"Remains some active constraints:\n" + csp.constraints.active.map(c => s"[${c.satisfaction(csp)}]$c").mkString("\n"))
   override def isSolution = true
 }
 
