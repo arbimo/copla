@@ -94,11 +94,11 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
       consistent(Nil)
     } else if (dom(variable).size > newDomain.size) {
       setDomainImpl(variable, newDomain)
-      consistent(Seq(DomainReduced(variable)))
+      consistent(varsWithId(id(variable)).map(DomainReduced(_)))
     } else if (dom(variable).size < newDomain.size && !isBound(variable)) {
       // domain increase and there is no bindng constraint forbiding its growth
       setDomainImpl(variable, newDomain)
-      consistent(Seq(DomainExtended(variable)))
+      consistent(varsWithId(id(variable)).map(DomainExtended(_)))
     } else {
       assert3(isBound(variable) || dom(variable) == newDomain)
       consistent(Nil)
