@@ -280,15 +280,19 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         else
           consistent
       // handled by constraint store
-      case WatchConstraint(c) if c.watched => // already watched
-        if (c.eventuallySatisfied)
-          addEvent(WatchedSatisfied(c))
-        else if (c.eventuallyViolated)
-          addEvent(WatchedViolated(c))
-        else
-          consistent
-      case WatchConstraint(c) => // not watched yet
-        consistent
+      case WatchConstraint(c) => // already watched
+        val onwatchRes = foreach(c.onWatch) {
+          case Watch(sub) => addWatcher(sub, c)
+        }
+        onwatchRes >> {
+          if (c.watched && c.eventuallySatisfied)
+            addEvent(WatchedSatisfied(c))
+          else if (c.watched && c.eventuallyViolated)
+            addEvent(WatchedViolated(c))
+          else
+            consistent
+        }
+
 
       case UnwatchConstraint(_) => consistent // handled by constraint store
       case WatchDelay(_, _)     => consistent // handled by STN
