@@ -1,6 +1,7 @@
 package copla.constraints.meta.dependencies
 
 import copla.constraints.meta.constraints.Constraint
+import copla.constraints.meta.stn.variables.Timepoint
 import copla.constraints.meta.variables.IVar
 
 import scala.collection.mutable
@@ -10,6 +11,7 @@ case object Root extends RootOrNode
 sealed trait Node extends RootOrNode
 case class Cst(c: Constraint) extends Node
 case class Var(v: IVar) extends Node
+case class Time(from: Timepoint, to: Timepoint) extends Node
 
 
 

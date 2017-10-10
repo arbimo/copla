@@ -8,6 +8,7 @@ import copla.constraints.meta.variables.IVar
 import scala.collection.mutable
 import updates._
 import copla.constraints.meta.dependencies._
+import copla.constraints.meta.stn.variables.{TemporalDelay, Timepoint}
 
 import scala.collection.immutable.Set
 
@@ -27,7 +28,10 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
   }
 
   val childrenOf: Node => Set[Node] = {
+    case Var(tp: Timepoint) => Set(Time(csp.temporalOrigin, tp))
+    case Var(d: TemporalDelay) => Set(Time(d.from.tp, d.to.tp))
     case Var(v) => Set()
+    case Time(_, _) => Set()
     case Cst(c) => c.variables.map(Var)
   }
 
@@ -41,11 +45,13 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
     foreach(nodes) {
       case Var(_) => consistent
       case Cst(c) => csp.addEvent(WatchConstraint(c))
+      case Time(from, to) => csp.addEvent(WatchDelay(from, to))
     }
 
   def treatRemovedNodes(nodes: Iterable[Node]): Update =
     foreach(nodes) {
       case Var(_) => consistent
+      case Time(from, to) => csp.addEvent(UnwatchDelay(from, to))
       case Cst(c) => csp.addEvent(UnwatchConstraint(c))
     }
 
@@ -89,9 +95,9 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
   def monitoredBy(constraint: Constraint): Iterable[Constraint] =
     depTree.children(Cst(constraint)).collect { case Cst(c) => c }
 
-  def isActive(constraint: Constraint) = depTree.children(Root).contains(Cst(constraint))
+  def isActive(constraint: Constraint): Boolean = depTree.children(Root).contains(Cst(constraint))
 
-  def isWatched(constraint: Constraint) = depTree.parents(Cst(constraint)).toSeq match {
+  def isWatched(constraint: Constraint): Boolean = depTree.parents(Cst(constraint)).toSeq match {
     case Seq()     => false
     case Seq(Root) => false
     case _         => true

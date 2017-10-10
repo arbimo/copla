@@ -139,14 +139,15 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   def dom(v: IntVariable): Domain = domains.domOpt(v).getOrElse(v.initialDomain)
 
   def updateDomain(v: IntVariable, newDomain: Domain): Update =
-    domains.updateDomain(v, newDomain).flatMap(
-      foreach(_)(addEvent(_))
-    )
+    domains
+      .updateDomain(v, newDomain)
+      .flatMap(
+        foreach(_)(addEvent(_))
+      )
 
   def bind(variable: IntVariable, value: Int) {
     post(variable === value)
   }
-
 
   def propagate(): Update = {
     var result: Update = consistent
@@ -208,7 +209,9 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
       case Undefined(changes) =>
         foreach(changes)(applyChange)
       case Inconsistency =>
-        assert3(constraint.eventuallyViolated, s"Constraint $constraint returned inconsistent while not eventually violated but ${constraint.satisfaction}.")
+        assert3(
+          constraint.eventuallyViolated,
+          s"Constraint $constraint returned inconsistent while not eventually violated but ${constraint.satisfaction}.")
         inconsistent(s"Inconsistency detected during propagation of $constraint")
     }
   }
@@ -288,6 +291,8 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         consistent
 
       case UnwatchConstraint(_) => consistent // handled by constraint store
+      case WatchDelay(_, _)     => consistent // handled by STN
+      case UnwatchDelay(_, _)   => consistent // handled by STN
       case _: NewInstance[_]    => consistent
       case e: CSPEvent          => fatal(s"CSPEvent $e was not properly handled")
       case _                    => consistent // not an internal CSP event, ignore
@@ -324,7 +329,8 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
   }
 
   def setSatisfied(constraint: Constraint): Update = {
-    assert2(constraint.eventuallySatisfied, s"Constraint $constraint is not (eventually) satisfied but ${constraint.satisfaction}")
+    assert2(constraint.eventuallySatisfied,
+            s"Constraint $constraint is not (eventually) satisfied but ${constraint.satisfaction}")
     addEvent(Satisfaction(constraint))
   }
 

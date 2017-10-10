@@ -1,6 +1,7 @@
 package copla.constraints.meta.events
 
 import copla.constraints.meta.constraints.Constraint
+import copla.constraints.meta.stn.variables.Timepoint
 import copla.constraints.meta.variables.{IVar, VarWithDomain}
 
 trait Event
@@ -12,6 +13,10 @@ case class NewConstraint(c: Constraint) extends CSPEvent
 case class WatchConstraint(c: Constraint) extends CSPEvent
 
 case class UnwatchConstraint(c: Constraint) extends CSPEvent
+
+case class WatchDelay(from: Timepoint, to: Timepoint) extends CSPEvent
+
+case class UnwatchDelay(from: Timepoint, to: Timepoint) extends CSPEvent
 
 case class NewVariableEvent(v: IVar) extends CSPEvent
 

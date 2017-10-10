@@ -32,23 +32,10 @@ class STNEventHandler(implicit val csp: CSP)
               stn.enforceBefore(csp.temporalOrigin, tp)
             stn.enforceBefore(tp, csp.temporalHorizon)
           }
-        case NewConstraint(c: TemporalConstraint) =>
-        // nothing to do, handled in propagation directly
-        case NewConstraint(c) =>
-          // not a pure temporal constraint, check if there is any temporal variables to watch in it
-          for ((tp1, tp2) <- watches(c))
-            stn.addWatchedDistance(tp1, tp2)
-        case WatchConstraint(c) =>
-          for ((tp1, tp2) <- watches(c))
-            stn.addWatchedDistance(tp1, tp2)
-        case Satisfaction(c: TemporalConstraint) => // no watches were recorded by this constraint
-        case Satisfaction(c)                     =>
-          // not a pure temporal constraint, check if there is any temporal variables to watch in it
-          for ((tp1, tp2) <- watches(c))
-            stn.removeWatchedDistance(tp1, tp2)
-        case UnwatchConstraint(c) =>
-          for ((tp1, tp2) <- watches(c))
-            stn.removeWatchedDistance(tp1, tp2)
+        case WatchDelay(from, to) =>
+          stn.addWatchedDistance(from, to)
+        case UnwatchDelay(from, to) =>
+          stn.removeWatchedDistance(from, to)
         case _ =>
       }
       watchesSanityChecks()
