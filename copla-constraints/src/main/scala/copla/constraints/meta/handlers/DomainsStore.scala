@@ -38,7 +38,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
 
   private val variablesById: mutable.Map[DomainID, mutable.Set[IntVariable]] = base match {
     case Some(x) => mutable.Map(x.variablesById.toSeq.map(p => (p._1, p._2.clone())): _*)
-    case _ => mutable.Map()
+    case _       => mutable.Map()
   }
 
   private val boundVariables: mutable.Set[IntVariable] = base match {
@@ -57,6 +57,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
 
   /** Returns the domain of a variable. Throws if the variable has no recorded domain. */
   private def dom(v: IntVariable): Domain = domainsById(variableIds(v))
+  private def dom(id: DomainID): Domain   = domainsById(id)
 
   /** Returns true if the variable has been previously recorded (i.e. is associated with a domain). */
   def recorded(v: IntVariable): Boolean = variableIds.contains(v)
@@ -71,7 +72,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
   }
 
   private def setId(variable: IntVariable, newId: DomainID): Unit = {
-    if(variableIds.contains(variable))
+    if (variableIds.contains(variable))
       variablesById(id(variable)) -= variable
     variableIds(variable) = newId
     variablesById.getOrElseUpdate(newId, mutable.Set()) += variable
@@ -136,33 +137,41 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     case NewConstraint(c: BindConstraint) =>
       boundVariables += c.variable
       consistent
-    case NewConstraint(x: EqualityConstraint) => (x.v1, x.v2) match {
-      case (left: IntVariable, right: IntVariable) if left != right && recorded(left) && recorded(right) && id(left) != id(right) =>
-        // merge
-        val lid = id(left)
-        val rid = id(right)
-        val commonDomain = dom(left).intersection(dom(right))
-        if(commonDomain.isEmpty) {
-          inconsistent(s"Equality constraint $x resulted in ${x.v1} and ${x.v2} having an empty domain.")
-        } else {
-          val changedVariables =
-            (if (commonDomain.size < dom(left).size) varsWithId(lid) else Set()) ++
-              (if (commonDomain.size != dom(right).size) varsWithId(rid) else Set())
+    case NewConstraint(x @ Eq(lid, rid)) if lid != rid =>
+      //merge
+      val commonDomain = domainsById(lid).intersection(domainsById(rid))
+      if (commonDomain.isEmpty) {
+        inconsistent(s"Equality constraint $x resulted in ${x.v1} and ${x.v2} having an empty domain.")
+      } else {
+        val changedVariables =
+          (if (commonDomain.size < dom(lid).size) varsWithId(lid) else Set()) ++
+            (if (commonDomain.size != dom(rid).size) varsWithId(rid) else Set())
 
-          for (v <- varsWithId(rid)) {
-            setId(v, lid)
-          }
-          assert3(varsWithId(rid).isEmpty)
-          emptySpots += rid
-          domainsById(rid) = null
-          domainsById(lid) = commonDomain
-
-          foreach(changedVariables)(v => csp.addEvent(DomainReduced(v)))
+        for (v <- varsWithId(rid)) {
+          setId(v, lid)
         }
-      case _ =>
-        consistent
-    }
+        assert3(varsWithId(rid).isEmpty)
+        emptySpots += rid
+        domainsById(rid) = null
+        domainsById(lid) = commonDomain
+
+        foreach(changedVariables)(v => csp.addEvent(DomainReduced(v)))
+      }
     case _ =>
       consistent
+  }
+
+  /** Deconstructor for Equality constraints. */
+  private object Eq {
+    def unapply(x: EqualityConstraint): Option[(DomainID, DomainID)] =
+      (x.v1, x.v2) match {
+        case (left: IntVariable, right: IntVariable) if recorded(left) && recorded(right) =>
+          if (id(left) < id(right))
+            Some((id(left), id(right)))
+          else
+            Some((id(right), id(left)))
+        case _ =>
+          None
+      }
   }
 }
