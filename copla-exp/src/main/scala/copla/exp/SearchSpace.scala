@@ -19,7 +19,7 @@ object SearchSpace extends App {
   slogging.LoggerConfig.factory = slogging.PrintLoggerFactory()
   slogging.LoggerConfig.level = slogging.LogLevel.WARN
 
-  val numTentatives = 20
+  val numTentatives = 200
   val numOrderings = 6
 
   val results: mutable.ArrayBuffer[(String, String, Int)] = mutable.ArrayBuffer()
@@ -40,17 +40,16 @@ object SearchSpace extends App {
     for (ord <- 0 until numOrderings) {
       val decisionOrdering = randomDecisionOrdering(ord, csp)
 
-      var successCount = 0
-      for (i <- 0 until numTentatives) {
-        val searcher: Searcher = csp => GreedySearcher.search(csp, decisionOrdering, OptionPicker.randomized(i), ctx => ctx.depth > 100)
 
+      val successCount = (0 until numTentatives).par.map(i => {
+        val searcher: Searcher = csp => GreedySearcher.search(csp, decisionOrdering, OptionPicker.randomized(i), ctx => ctx.depth > 100)
         searcher.search(csp) match {
-          case x@Solution(sol) =>
-            successCount += 1
-          case NoSolutionFound(_) => // keep searching
+          case x@Solution(sol) => true
+          case NoSolutionFound(_) => false
           case x => sys.error(x.toString)
         }
-      }
+      }).count(x => x)
+
       println(s"$decisionOrdering: $successCount / $numTentatives <- ${pbFile.getName}")
       results += ((decisionOrdering.toString, pbFile.getName, successCount))
     }
