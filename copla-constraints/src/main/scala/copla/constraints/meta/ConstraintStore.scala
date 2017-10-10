@@ -30,9 +30,9 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
   }
 
   /** Dependency tree tracking all active constraints and the constraints/variables they are watching. */
-  val depTree: DependencyTree = toClone match {
+  val depTree: DependencyGraph = toClone match {
     case Some(base) => base.depTree.clone()
-    case None       => new DependencyTree()
+    case None       => new DependencyGraph()
   }
 
   val childrenOf: Node => Set[Node] = {

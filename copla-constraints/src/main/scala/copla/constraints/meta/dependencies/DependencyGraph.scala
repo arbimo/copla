@@ -7,16 +7,31 @@ import copla.constraints.meta.variables.IVar
 import scala.collection.mutable
 
 sealed trait RootOrNode
+/** Root of the DAG */
 case object Root extends RootOrNode
 sealed trait Node extends RootOrNode
+
+/** Constraint node, outgoing edges might target:
+  * (i) other constraints for which the constraint requires notification of changes.
+  * (ii) Variables on which it depends.
+  */
 case class Cst(c: Constraint) extends Node
+
+/** Variable node.
+  * A variable node representing temporal information might have dependencies to a Time node.
+  */
 case class Var(v: IVar) extends Node
+
+/** Represents a temporal delay between two timepoints. */
 case class Time(from: Timepoint, to: Timepoint) extends Node
 
 
-
-
-class DependencyTree(optBase: Option[DependencyTree] = None) {
+/**
+  * A Directed Acyclic graph keep track of dependencies between constraints.
+  *
+  * The graph is incrementally maintained such that all nodes are reachable from the Root
+  */
+class DependencyGraph(optBase: Option[DependencyGraph] = None) {
 
   val tree: mutable.Map[RootOrNode, mutable.Set[Node]] = optBase match {
     case Some(base) => mutable.Map(base.tree.mapValues(_.clone).toSeq: _*)
@@ -52,6 +67,10 @@ class DependencyTree(optBase: Option[DependencyTree] = None) {
     case x: Node => inverseTree.contains(x)
   }
 
+  /** Add an edge to the tree. If the target node is not present, then its children are
+    * recursively generated and added to the graph by quering the given function.
+    *
+    * @return All nodes that were added to the graph. */
   def addEdge(from: RootOrNode, to: Node, children: Node => Set[Node]): Seq[Node] = {
     require(contains(from))
     if(contains(to)) {
@@ -65,6 +84,11 @@ class DependencyTree(optBase: Option[DependencyTree] = None) {
     }
   }
 
+  /**
+    * Removes an edge from the graph. If the target of the edge is no longer attached to the root,
+    * then it is remove from the graph together with all its children that are no longer reachable from the root.
+    * @return A list of all nodes that were removed from the graph.
+    */
   def removeEdge(from: RootOrNode, to: Node): Seq[Node] = {
     deleteEdgeUnsafe(from, to)
     numParents(to) match {
@@ -82,11 +106,11 @@ class DependencyTree(optBase: Option[DependencyTree] = None) {
     }
   }
 
-  override def clone(): DependencyTree = new DependencyTree(Some(this))
+  override def clone(): DependencyGraph = new DependencyGraph(Some(this))
 
 }
 
 
-object DependencyTree {
+object DependencyGraph {
 
 }

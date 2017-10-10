@@ -19,7 +19,7 @@ class DependenciesTest extends FunSuite {
   }
 
   test("constraint addition") {
-    val tree = new DependencyTree()
+    val tree = new DependencyGraph()
     val c1 = v1 === v2 || v1 === v3
     val c2 = v3 === v2
     val c3 = c1 && c2
