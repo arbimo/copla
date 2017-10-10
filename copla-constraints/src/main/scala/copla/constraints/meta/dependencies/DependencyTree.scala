@@ -35,9 +35,11 @@ class DependencyTree(optBase: Option[DependencyTree] = None) {
   private def deleteEdgeUnsafe(from: RootOrNode, to: Node): Unit = {
     tree.getOrElse(from, mutable.Set()) -= to
     inverseTree.getOrElse(to, mutable.Set()) -= from
+    if(from.isInstanceOf[Node] && numChildren(from) == 0)
+      tree -= from
   }
 
-  def numChildren(node: Node): Int = tree.get(node).map(_.size).getOrElse(0)
+  def numChildren(node: RootOrNode): Int = tree.get(node).map(_.size).getOrElse(0)
   def numParents(node: Node): Int = inverseTree.get(node).map(_.size).getOrElse(0)
 
   def nodes: Iterable[Node] = inverseTree.keySet
