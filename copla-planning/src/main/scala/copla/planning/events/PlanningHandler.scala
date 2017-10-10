@@ -180,6 +180,7 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
         val instance = actionTemplate.instance(actionTemplate.name + "_" + actions.size)
         actions += instance
         insertChronicle(new Chronicle(instance.content)) >>
+          csp.post(tp(instance.start) <= tp(instance.end)) >>
           csp.post(csp.temporalOrigin <= tp(instance.start)) >> {
           support match {
             case Some(supportVar) => csp.post(new SupportByAction(instance, supportVar))
