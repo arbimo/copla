@@ -54,6 +54,9 @@ trait Domain {
 
   def -(toRm: Int): Domain = remove(toRm)
 
+  def --(toRemove: Iterable[Int]): Domain =
+    toRemove.foldLeft(this)((dom, toRm) => dom - toRm)
+
   def add(value: Int): Domain =
     new EnumeratedDomain(values.toSet + value)
 
