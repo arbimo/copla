@@ -110,7 +110,7 @@ object Planner extends App with slogging.StrictLogging {
 object Utils {
 
   def csp(pb: Problem): CSP = {
-    val csp = new CSP(Left(new Configuration(enforceTpAfterStart = false)))
+    val csp = new CSP(Left(new Configuration()))
     csp.addHandler(new PlanningHandler(csp, Left(pb)))
     csp.addEvent(InitPlanner)
     csp

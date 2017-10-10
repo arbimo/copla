@@ -27,9 +27,6 @@ class PlanningHandler(_csp: CSP, base: Either[Problem, PlanningHandler])
 
   val log = logger
 
-  assert1(!csp.conf.enforceTpAfterStart,
-          "Planner needs to be able some timepoints before the CSP's temporal origin.")
-
   val pb: Problem = base match {
     case Left(anmlProblem) => anmlProblem
     case Right(prev)       => prev.pb
