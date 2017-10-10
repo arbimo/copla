@@ -97,10 +97,9 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
 
   def isActive(constraint: Constraint): Boolean = depTree.children(Root).contains(Cst(constraint))
 
-  def isWatched(constraint: Constraint): Boolean = depTree.parents(Cst(constraint)).toSeq match {
-    case Seq()     => false
-    case Seq(Root) => false
-    case _         => true
+  def isWatched(constraint: Constraint): Boolean = {
+    val parents = depTree.parents(Cst(constraint))
+    parents.size >= 2 || (parents.size == 1 && !parents.contains(Root))
   }
 
   /** All constraints that have been posted (not including the ones that are watched) */

@@ -44,8 +44,8 @@ class DependencyTree(optBase: Option[DependencyTree] = None) {
 
   def nodes: Iterable[Node] = inverseTree.keySet
 
-  def children(node: RootOrNode): Set[Node] = tree.get(node).map(_.toSet).getOrElse(Set())
-  def parents(node: Node): Set[RootOrNode] = inverseTree.get(node).map(_.toSet).getOrElse(Set())
+  def children(node: RootOrNode): collection.Set[Node] = tree.getOrElse(node, Set())
+  def parents(node: Node): collection.Set[RootOrNode] = inverseTree.getOrElse(node, Set())
 
   def contains(node: RootOrNode): Boolean = node match {
     case Root => assert(tree.contains(Root)); true
