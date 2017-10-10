@@ -35,7 +35,7 @@ class Specialization private (val specialized: Constraint, val general: Constrai
   /** Returns the invert of this constraint (e.g. === for an =!= constraint) */
   override def reverse: Constraint = specialized.reverse
 
-  override def toString: String = s"$general <- spec[$specialized]"
+  override def toString: String = s"spec[$specialized]"
 }
 
 object Specialization {
@@ -59,21 +59,29 @@ object Specialization {
 
       case c: DisjunctiveConstraint =>
         val disjuncts = c.disjuncts.map(sc => specialize(sc)).filterNot(_.eventuallyViolated)
-        if(disjuncts.exists(_.eventuallySatisfied))
-          tautology(c)
-        else if(disjuncts.isEmpty)
-          contradiction(c)
-        else
-          spec(new DisjunctiveConstraint(disjuncts), c)
+        disjuncts match {
+          case _ if disjuncts.exists(_.eventuallySatisfied) =>
+            tautology(c)
+          case Seq() =>
+            contradiction(c)
+          case Seq(single) =>
+            spec(single, c)
+          case _ =>
+            spec(new DisjunctiveConstraint(disjuncts), c)
+        }
 
       case c: ConjunctionConstraint =>
         val conjuncts = c.constraints.map(specialize).filterNot(_.eventuallySatisfied)
-        if(conjuncts.isEmpty)
-          tautology(c)
-        else if(conjuncts.exists(_.eventuallyViolated))
-          contradiction(c)
-        else
-          spec(new ConjunctionConstraint(conjuncts), c)
+        conjuncts match {
+          case _ if conjuncts.exists(_.eventuallyViolated) =>
+            contradiction(c)
+          case Seq() =>
+            tautology(c)
+          case Seq(single) =>
+            spec(single, c)
+          case _ =>
+            spec(new ConjunctionConstraint(conjuncts), c)
+        }
 
       case c =>
         c
