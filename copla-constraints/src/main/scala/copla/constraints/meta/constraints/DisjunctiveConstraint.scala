@@ -68,13 +68,19 @@ class DisjunctiveConstraint(val disjuncts: Seq[Constraint]) extends Constraint {
             Undefined()
           }
         case NewConstraint(_) =>
-          decisionVar.domain.values.find(i => disjuncts(i).eventuallySatisfied) match {
+          val satisfactions = decisionVar.domain.values.map(i => (i, disjuncts(i).satisfaction))
+          val valids =  satisfactions.collectFirst { case (i, s) if s.isInstanceOf[EventuallySatisfied] => i }
+          val invalids = satisfactions.collect { case (i, s) if s.isInstanceOf[EventuallyViolated] => i }.toSet
+
+          valids match {
             case Some(_) =>
               assert3(eventuallySatisfied)
               Satisfied(RetractDecision(decision))
-            case None =>
-              assert3(!eventuallySatisfied)
+            case None if invalids.isEmpty =>
               Undefined()
+            case _ =>
+              val newDomain = decisionVar.domain -- invalids
+              Undefined(UpdateDomain(decisionVar, newDomain))
           }
       }
     }
