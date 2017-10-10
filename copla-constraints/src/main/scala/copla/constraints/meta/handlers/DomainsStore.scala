@@ -1,9 +1,10 @@
 package copla.constraints.meta.handlers
 
 import copla.constraints.meta.CSP
-import copla.constraints.meta.constraints.{BindConstraint, EqualityConstraint}
+import copla.constraints.meta.constraints.{BindConstraint, EqualityConstraint, InequalityConstraint}
 import copla.constraints.meta.domains.Domain
 import copla.constraints.meta.events._
+import copla.constraints.meta.handlers.DomainsStore.{DomainID, Watches}
 import copla.constraints.meta.updates._
 import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.{IntVariable, VarWithDomain}
@@ -13,8 +14,6 @@ import scala.collection.mutable
 class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     extends InternalCSPEventHandler
     with slogging.LazyLogging {
-
-  type DomainID = Int
 
   private val domainsById: mutable.ArrayBuffer[Domain] = base match {
     case Some(base) => base.domainsById.clone()
@@ -44,6 +43,11 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
   private val boundVariables: mutable.Set[IntVariable] = base match {
     case Some(x) => x.boundVariables.clone()
     case _       => mutable.Set()
+  }
+
+  private val watches: Watches = base match {
+    case Some(x) => x.watches.clone()
+    case _ => new Watches()
   }
 
   /** Returns true if the two variables are subject to an equality constraint. */
@@ -133,6 +137,7 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
     variablesById(id).toSeq
   }
 
+
   override def handleEvent(event: Event): Update = event match {
     case NewConstraint(c: BindConstraint) =>
       boundVariables += c.variable
@@ -155,8 +160,36 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
         domainsById(rid) = null
         domainsById(lid) = commonDomain
 
-        foreach(changedVariables)(v => csp.addEvent(DomainReduced(v)))
+        val satisfiedWatches = watches.getEqualityWatches(lid, rid).map(WatchedSatisfied(_))
+        val violatedWatches = watches.getDiffWatches(lid, rid).map(WatchedViolated(_))
+
+        for(oid <- watches.equalityWatches.keySet if watches.equalityWatches(oid).contains(rid)) {
+          watches.getEqualityWatches(oid, lid) ++= watches.getEqualityWatches(oid, rid)
+          watches.removeEqualityWatches(oid, rid)
+        }
+        for(oid <- watches.diffWatches.keySet if watches.diffWatches(oid).contains(rid)) {
+          watches.getDiffWatches(oid, lid) ++= watches.getDiffWatches(oid, rid)
+          watches.removeDiffWatches(oid, rid)
+        }
+
+        foreach(violatedWatches)(e => csp.addEvent(e)) >>
+          foreach(satisfiedWatches)(e => csp.addEvent(e)) >>
+          foreach(changedVariables)(v => csp.addEvent(DomainReduced(v)))
+
       }
+    case WatchConstraint(c @ Eq(lid, rid)) if lid == rid =>
+      csp.addEvent(WatchedSatisfied(c))
+    case WatchConstraint(c @  Eq(lid, rid)) =>
+      watches.getEqualityWatches(lid, rid) += c
+      consistent
+
+    case WatchConstraint(c @ Diff(lid, rid)) if lid == rid =>
+      csp.addEvent(WatchedViolated(c))
+    case WatchConstraint(c @ Diff(lid, rid)) =>
+      watches.getDiffWatches(lid, rid) += c
+      consistent
+//      csp.addEvent(WatchedViolated(c))
+
     case _ =>
       consistent
   }
@@ -173,5 +206,81 @@ class DomainsStore(csp: CSP, base: Option[DomainsStore] = None)
         case _ =>
           None
       }
+  }
+
+  private object Diff {
+    def unapply(c: InequalityConstraint): Option[(DomainID, DomainID)] = (c.v1, c.v2) match {
+        case (left: IntVariable, right: IntVariable) if recorded(left) && recorded(right) =>
+          if (id(left) < id(right))
+            Some((id(left), id(right)))
+          else
+            Some((id(right), id(left)))
+        case _ =>
+          None
+      }
+  }
+
+}
+
+object DomainsStore {
+  type DomainID = Int
+
+  class Watches(optBase: Option[Watches] = None) {
+
+    val equalityWatches: mutable.Map[DomainID, mutable.Map[DomainID, mutable.Set[EqualityConstraint]]] =
+      optBase match {
+        case Some(base) =>
+          mutable.Map(
+            base.equalityWatches.mapValues(m => mutable.Map(m.mapValues(_.clone()).toSeq: _*)).toSeq: _*)
+        case _ => mutable.Map()
+      }
+
+    val diffWatches: mutable.Map[DomainID, mutable.Map[DomainID, mutable.Set[InequalityConstraint]]] =
+      optBase match {
+        case Some(base) =>
+          mutable.Map(
+            base.diffWatches.mapValues(m => mutable.Map(m.mapValues(_.clone()).toSeq: _*)).toSeq: _*)
+        case _ => mutable.Map()
+      }
+
+    def getEqualityWatches(lid: DomainID, rid: DomainID): mutable.Set[EqualityConstraint] = {
+      if (lid <= rid)
+        equalityWatches.getOrElseUpdate(lid, mutable.Map()).getOrElseUpdate(rid, mutable.Set())
+      else
+        getEqualityWatches(rid, lid)
+    }
+
+    def removeEqualityWatches(lid: DomainID, rid: DomainID): Unit = {
+      if (lid <= rid) {
+        if (equalityWatches.contains(lid)) {
+          equalityWatches(lid) -= rid
+          if (equalityWatches(lid).isEmpty)
+            equalityWatches -= lid
+        }
+      } else {
+        removeEqualityWatches(rid, lid)
+      }
+    }
+
+    def getDiffWatches(lid: DomainID, rid: DomainID): mutable.Set[InequalityConstraint] = {
+      if (lid <= rid)
+        diffWatches.getOrElseUpdate(lid, mutable.Map()).getOrElseUpdate(rid, mutable.Set())
+      else
+        getDiffWatches(rid, lid)
+    }
+
+    def removeDiffWatches(lid: DomainID, rid: DomainID): Unit = {
+      if (lid <= rid) {
+        if (diffWatches.contains(lid)) {
+          diffWatches(lid) -= rid
+          if (diffWatches(lid).isEmpty)
+            diffWatches -= lid
+        }
+      } else {
+        removeDiffWatches(rid, lid)
+      }
+    }
+
+    override def clone: Watches = new Watches(Some(this))
   }
 }
