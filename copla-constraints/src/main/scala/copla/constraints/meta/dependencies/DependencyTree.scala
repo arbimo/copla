@@ -38,6 +38,8 @@ class DependencyTree(optBase: Option[DependencyTree] = None) {
   def numChildren(node: Node): Int = tree.get(node).map(_.size).getOrElse(0)
   def numParents(node: Node): Int = inverseTree.get(node).map(_.size).getOrElse(0)
 
+  def nodes: Iterable[Node] = inverseTree.keySet
+
   def children(node: RootOrNode): Set[Node] = tree.get(node).map(_.toSet).getOrElse(Set())
   def parents(node: Node): Set[RootOrNode] = inverseTree.get(node).map(_.toSet).getOrElse(Set())
 

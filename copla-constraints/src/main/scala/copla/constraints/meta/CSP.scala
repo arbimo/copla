@@ -235,11 +235,11 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
           propagate(c, event)
 
       case e: DomainChange =>
-        foreach(constraints.activeWatching(e.variable))(c => {
+        foreach(constraints.watching(e.variable).filter(_.active))(c => {
           assert2(c.active)
           propagate(c, e)
         }) >>
-          foreach(constraints.monitoredWatching(e.variable))(c => {
+          foreach(constraints.watching(e.variable).filter(_.watched))(c => {
             assert2(c.watched)
             if (c.eventuallySatisfied)
               addEvent(WatchedSatisfied(c))
@@ -285,7 +285,6 @@ class CSP(toClone: Either[Configuration, CSP] = Left(new Configuration))
         else
           consistent
       case WatchConstraint(c) => // not watched yet
-        logger.warn("WatchConstraint directive of a constraint that was not previously recorded.")
         consistent
 
       case UnwatchConstraint(_) => consistent // handled by constraint store
