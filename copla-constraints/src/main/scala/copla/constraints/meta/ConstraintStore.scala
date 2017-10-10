@@ -3,7 +3,7 @@ package copla.constraints.meta
 import copla.constraints.meta.constraints._
 import copla.constraints.meta.events._
 import copla.constraints.meta.util.Assertion._
-import copla.constraints.meta.variables.IVar
+import copla.constraints.meta.variables.{IVar, IntVariable}
 
 import scala.collection.mutable
 import updates._
@@ -17,11 +17,19 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
 
   def this(_csp: CSP) = this(_csp, None)
 
+  /** All constraints that were once active and are now satisfied.  */
   val satisfied: mutable.Set[Constraint] = toClone match {
     case None       => mutable.Set[Constraint]()
     case Some(base) => base.satisfied.clone()
   }
 
+  /** Index each satisfied constraint by its variables. */
+  val satisfiedByVariable: mutable.Map[IVar, mutable.Set[Constraint]] = toClone match {
+    case Some(base) => mutable.Map(base.satisfiedByVariable.mapValues(_.clone()).toSeq: _*)
+    case None => mutable.Map()
+  }
+
+  /** Dependency tree tracking all active constraints and the constraints/variables they are watching. */
   val depTree: DependencyTree = toClone match {
     case Some(base) => base.depTree.clone()
     case None       => new DependencyTree()
@@ -65,6 +73,9 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
   private def onSatisfaction(constraint: Constraint) {
     val removals = depTree.removeEdge(Root, Cst(constraint))
     satisfied += constraint
+    for(v <- constraint.variables) {
+      satisfiedByVariable.getOrElseUpdate(v, mutable.Set()) += constraint
+    }
     treatRemovedNodes(removals)
   }
 
@@ -115,12 +126,13 @@ class ConstraintStore(_csp: CSP, toClone: Option[ConstraintStore]) {
         record(constraint)
       case DomainExtended(v) =>
         // TODO: should index satisfied constraints by variable
-        for (c <- satisfied.clone()) {
-          if (c.variables.contains(v)) {
-            // repost constraint
-            satisfied -= c
-            csp.post(c)
-          }
+        for (c <- satisfiedByVariable.getOrElse(v, Nil)) {
+          assert3(c.variables.contains(v))
+          // remove from satisfied and repost constraint
+          satisfied -= c
+          for(v <- c.variables)
+            satisfiedByVariable(v) -= c
+          csp.post(c)
         }
       case _ =>
     }
