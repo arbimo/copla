@@ -107,10 +107,4 @@ class DependencyGraph(optBase: Option[DependencyGraph] = None) {
   }
 
   override def clone(): DependencyGraph = new DependencyGraph(Some(this))
-
-}
-
-
-object DependencyGraph {
-
 }
