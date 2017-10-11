@@ -2,6 +2,7 @@ package copla.lang
 
 import java.io.File
 
+import copla.lang.analysis.{AbstractionHierarchyType, DetailedKnoblock, Knoblock}
 import copla.lang.model.format.Formatter
 import copla.lang.model.{core, full}
 
@@ -9,7 +10,8 @@ sealed trait Mode
 object ParsingMode extends Mode
 object AbstractionHierarchyMode extends Mode
 
-case class Config(mode: Mode = ParsingMode, anmlFile: File = new File("."), full: Boolean = false)
+case class Config(mode: Mode = ParsingMode, anmlFile: File = new File("."), full: Boolean = false,
+                  abstractionHierarchyType: AbstractionHierarchyType = DetailedKnoblock)
 
 object ParserApp extends App {
 
@@ -30,6 +32,12 @@ object ParserApp extends App {
       .text("Displays an a hierarchy of the fluents in the domain, corresponding to Knoblock's abstraction hierarchies.")
       .action((_, c) => c.copy(mode = AbstractionHierarchyMode))
       .children(
+        opt[String]("type")
+            .text("""Either "detailed" or "knoblock" """)
+            .action((typ, c) => typ match {
+              case "detailed" => c.copy(abstractionHierarchyType = DetailedKnoblock)
+              case "knoblock" => c.copy(abstractionHierarchyType = Knoblock)
+            }),
         checkConfig(c => if(c.mode == AbstractionHierarchyMode && c.full) failure("fluent hierarchy cannot by checked on full model.") else success)
       )
   }
@@ -57,7 +65,7 @@ object ParserApp extends App {
       handleResult(parse(conf.anmlFile),
         (m: core.CoreModel) => {
           println(
-            analysis.abstractionHierarchy(m)
+            analysis.abstractionHierarchy(m, conf.abstractionHierarchyType)
               .toSeq
               .map { case (fluent, lvl) => s"$lvl $fluent"}
               .sorted

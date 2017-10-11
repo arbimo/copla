@@ -8,6 +8,10 @@ import scala.collection.immutable
 
 package object analysis {
 
+  sealed trait AbstractionHierarchyType
+  case object Knoblock extends AbstractionHierarchyType
+  case object DetailedKnoblock extends AbstractionHierarchyType
+
   /** Tarjan's algorithm for extracting strongly connected components.
     *
     * Given a directed graph, the algorithm outputs a sequence of strongly connected
@@ -74,7 +78,7 @@ package object analysis {
 
   /** Computes an abstraction hierarchy, has defined by Knoblock.
     * Each fluent is associated to a level such that a fluent at a level does not affect the fluents at the level N+1. */
-  def abstractionHierarchy(model: CoreModel): Map[FluentTemplate, Int] = {
+  def abstractionHierarchy(model: CoreModel, typ: AbstractionHierarchyType): Map[FluentTemplate, Int] = {
     val graph: Map[FluentTemplate, mutable.Set[FluentTemplate]] =
       model.collect { case FunctionDeclaration(x: FluentTemplate) => (x, mutable.Set[FluentTemplate]()) }.toMap
 
@@ -97,10 +101,41 @@ package object analysis {
     }
 
     val sccs = tarjan(graph.mapValues(_.toSet))
+    val postProcessed = typ match {
+      case Knoblock => sccs
+      case DetailedKnoblock => sccs.flatMap(scc => subHierarchy(scc, actions))
+    }
 
-    sccs
+    postProcessed
       .zipWithIndex
       .flatMap({ case (scc, lvl) => scc.toSeq.map((_, lvl))})
       .toMap
+  }
+
+  def subHierarchy(fluents: Set[FluentTemplate], actions: Seq[ActionTemplate]): Seq[Set[FluentTemplate]] = {
+    val graph: Map[FluentTemplate, mutable.Set[FluentTemplate]] =
+      fluents.map(_ -> mutable.Set[FluentTemplate]()).toMap
+
+    def affectsFirstButNotSecond(action: ActionTemplate, f1: FluentTemplate, f2: FluentTemplate): Boolean = {
+      affectedBy(action).contains(f1) && !affectedBy(action).contains(f2)
+    }
+    def affectsBoth(action: ActionTemplate, f1: FluentTemplate, f2: FluentTemplate): Boolean = {
+      affectedBy(action).contains(f1) && affectedBy(action).contains(f2)
+    }
+
+    for(f1 <- fluents ; f2 <- fluents if f1 != f2) {
+      if (actions.exists(affectsFirstButNotSecond(_, f1, f2)))
+        graph(f2) += f1
+
+      if(actions.exists(affectsFirstButNotSecond(_, f2, f1)))
+        graph(f1) += f2
+
+      if(!actions.exists(affectsFirstButNotSecond(_, f2, f1)) && !actions.exists(affectsFirstButNotSecond(_, f1, f2))) {
+        graph(f1) += f2
+        graph(f2) += f1
+      }
+
+    }
+    tarjan(graph.mapValues(_.toSet))
   }
 }
