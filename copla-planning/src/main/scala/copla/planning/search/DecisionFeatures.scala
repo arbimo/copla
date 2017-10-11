@@ -2,8 +2,10 @@ package copla.planning.search
 
 import copla.constraints.meta.CSPView
 import copla.constraints.meta.decisions.Decision
+import copla.lang.analysis.AbstractionHierarchyType
 import copla.lang.model.core.FluentTemplate
 import copla.planning.causality.support.SupportDecision
+import copla.planning.events.PlanningHandler
 
 object DecisionFeatures {
 
@@ -94,6 +96,14 @@ object DecisionFeatures {
     val numOptions = numOptionsExt.lowestFirst.withName("#options")
     val isSupport = isSupportDecision.trueFirst.withName("is-support")
     val isNotSupport = isSupportDecision.falseFirst.withName("not-support")
+
+    def absLvl(csp: CSPView, typ: AbstractionHierarchyType) = {
+      val hier = copla.lang.analysis.abstractionHierarchy(
+        csp.getHandler(classOf[PlanningHandler]).pb.anml,
+        typ
+      )
+      supportDecisionFluent.mapValue(f => hier(f)).lowestDefinedFirst.withName(typ.toString)
+    }
   }
 
 }

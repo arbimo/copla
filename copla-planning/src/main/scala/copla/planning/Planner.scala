@@ -14,7 +14,7 @@ case class Config(file: File = new File("."), tentatives: Int = 1000, seed: Int 
 object Planner extends App with slogging.StrictLogging {
 
   slogging.LoggerConfig.factory = slogging.SLF4JLoggerFactory()
-  slogging.LoggerConfig.level = slogging.LogLevel.DEBUG
+  slogging.LoggerConfig.level = slogging.LogLevel.WARN
 
   val parser = new scopt.OptionParser[Config]("copla") {
     head("copla")

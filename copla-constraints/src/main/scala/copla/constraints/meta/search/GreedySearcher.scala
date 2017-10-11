@@ -42,8 +42,8 @@ object GreedySearcher extends slogging.StrictLogging {
   }
   private case class ContextImpl(csp: CSPView, depth: Int) extends Context
 
-  def search(csp: CSP, decOrd: DecisionOrdering, picker: OptionPicker, stopCondition: Context => Boolean): SearchResult = {
-    searchRec(csp.clone, decOrd, picker, stopCondition, curDepth = 0)
+  def search(csp: CSP, decOrd: CSP => DecisionOrdering, picker: OptionPicker, stopCondition: Context => Boolean): SearchResult = {
+    searchRec(csp.clone, decOrd(csp), picker, stopCondition, curDepth = 0)
   }
 
   @tailrec

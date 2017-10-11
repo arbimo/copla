@@ -3,6 +3,7 @@ package copla.planning.search
 import copla.constraints.meta.CSPView
 import copla.constraints.meta.decisions.Decision
 import copla.constraints.meta.search.DecisionOrdering
+import copla.lang.analysis.DetailedKnoblock
 import copla.planning.search.DecisionFeatures.Extractor
 
 object DecisionOrderings {
@@ -21,6 +22,12 @@ object DecisionOrderings {
   }
 
   import DecisionFeatures.extractors._
-  val default: DecisionOrdering = SeqFeatures(noChoice :: isSupport :: numOptions :: Nil)
+  val default: CSPView => DecisionOrdering =
+    (csp: CSPView) => SeqFeatures(
+      noChoice ::
+        isSupport ::
+        absLvl(csp, DetailedKnoblock) ::
+        numOptions ::
+        Nil)
 
 }

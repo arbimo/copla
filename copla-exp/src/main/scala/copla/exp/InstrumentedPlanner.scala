@@ -11,11 +11,12 @@ import copla.planning.search.DecisionOrderings
 
 object InstrumentedPlanner extends App {
 
-  slogging.LoggerConfig.factory = slogging.PrintLoggerFactory()
-  slogging.LoggerConfig.level = slogging.LogLevel.WARN
+  slogging.LoggerConfig.factory = slogging.SLF4JLoggerFactory()
+  slogging.LoggerConfig.level = slogging.LogLevel.DEBUG
 
-  val pbFile = new File(defaultExpDir, "handover-flat.p01.pb.anml")
-
+  //  val pbFile = new File(defaultExpDir, "handover-flat.p01.pb.anml")
+  //  val pbFile = new File(defaultExpDir, "blocks_ipc2.p04-0.pb.anml")
+    val pbFile = new File(defaultExpDir, "docks-flat.p1.pb.anml")
 
   val baseCsp = Problem.from(pbFile)
       .map(Utils.csp) match {
@@ -33,7 +34,7 @@ object InstrumentedPlanner extends App {
   csp.addHandler(new Instrumentation())
 
   val searcher: Searcher = csp =>
-    GreedySearcher.search(csp, DecisionOrderings.default, OptionPicker.randomized(10), ctx => ctx.depth > 46)
+    GreedySearcher.search(csp, DecisionOrderings.default, OptionPicker.randomized(0), ctx => ctx.depth > 10)
 
   val lastCSP = searcher.search(csp) match {
     case x@Solution(sol) =>
