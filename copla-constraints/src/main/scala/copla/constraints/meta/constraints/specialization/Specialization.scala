@@ -35,7 +35,7 @@ class Specialization private (val specialized: Constraint, val general: Constrai
   /** Returns the invert of this constraint (e.g. === for an =!= constraint) */
   override def reverse: Constraint = specialized.reverse
 
-  override def toString: String = s"spec[$specialized]"
+  override def toString: String = s"spec[$specialized] <- $general"
 }
 
 object Specialization {
