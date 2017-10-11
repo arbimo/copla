@@ -1,6 +1,5 @@
 package copla.planning.causality
 
-import copla.constraints.bindings.InconsistentBindingConstraintNetwork
 import copla.constraints.meta.{CSP, CSPView}
 import copla.constraints.meta.constraints._
 
@@ -12,6 +11,7 @@ import copla.constraints.meta.util.Assertion._
 import copla.constraints.meta.variables.{IVar, IntVar, IntVariable, VarWithDomain}
 import copla.lang.model.core
 import copla.planning.structures.Holds
+import copla.planning.variables.InstanceVar
 
 class PotentialSupport(context: CausalHandler) {
 
@@ -90,8 +90,14 @@ class ActionPotentialSupport(val act: core.ActionTemplate, private var context: 
     planner.variables.get(localVar) match {
       case Some(variable) => // variable already exists, use its initial domain
         variable.initialDomain(planner.csp)
-      case None => // variable is not declared yet (e.g. can be one of the action arguments), use its type to infer possible values
-        planner.types.get(localVar.typ).asDomain
+      case None =>
+        localVar match {
+          case v: core.Instance =>
+            new InstanceVar(v, planner.types.get(v.typ)).initialDomain(planner.csp)
+          case _ =>
+            // variable is not declared yet (e.g. can be one of the action arguments), use its type to infer possible values
+            planner.types.get(localVar.typ).asDomain
+        }
     }
   }
 
